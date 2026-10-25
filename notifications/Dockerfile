@@ -10,4 +10,4 @@ COPY --from=target /target/dependency/BOOT-INF/lib /app/lib
 COPY --from=target /target/dependency/META-INF /app/META-INF
 COPY --from=target /target/dependency/BOOT-INF/classes /app
 
-ENTRYPOINT ["java","-cp","app:app/lib/*","io.averkhoglyad.shortcut.message.NotificationAppKt"]
+ENTRYPOINT ["java","-cp","app:app/lib/*","io.averkhoglyad.shortcut.notification.NotificationAppKt"]

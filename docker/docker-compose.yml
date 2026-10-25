@@ -2,6 +2,31 @@ version: '3.9'
 name: shortcut-local
 
 services:
+  loki:
+    image: grafana/loki:3.5.3
+    ports:
+      - "9100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    environment:
+      - GF_PATHS_PROVISIONING=/etc/grafana/provisioning
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    volumes:
+      - ./grafana:/etc/grafana/provisioning/datasources
+    ports:
+      - "9000:3000"
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.8.0
     container_name: zookeeper
@@ -67,24 +92,19 @@ services:
       start_period: 30s
     restart: always
     volumes:
-      - ./docker/postgresql/data:/var/lib/postgresql/data
-
-  gateway:
-    image: nginx:latest
-    container_name: gateway
-    ports:
-      - "8000:80"
-    volumes:
-      - ./docker/nginx/conf.d:/etc/nginx/conf.d
-    restart: always
+      - ./postgresql/data:/var/lib/postgresql/data
 
   users-app:
-    image: "shortcut/users:0.0.4-SNAPSHOT"
+    image: "shortcut/users:0.0.5-SNAPSHOT"
+    ports:
+      - "8080:8080"
     command:
+      - "--spring.profiles.active=logging-loki"
       - "--spring.datasource.url=jdbc:postgresql://postgres:5432/users_app_db"
       - "--spring.datasource.username=user"
       - "--spring.datasource.password=pass"
       - "--spring.kafka.bootstrap-servers=kafka:9092"
+      - "--logging.loki.base-url=http://loki:3100"
     healthcheck:
       test: "curl --fail --silent localhost:8080/actuator/health | grep UP || exit 1"
       interval: 20s
@@ -113,7 +133,7 @@ services:
     ports:
       - "16379:6379"
     volumes:
-      - ./docker/redis/data:/data
+      - ./redis/data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
@@ -121,11 +141,13 @@ services:
       retries: 5
 
   mail-sender:
-    image: "shortcut/mail-sender:0.0.4-SNAPSHOT"
+    image: "shortcut/mail-sender:0.0.5-SNAPSHOT"
     command:
+      - "--spring.profiles.active=logging-loki"
       - "--spring.kafka.bootstrap-servers=kafka:9092"
       - "--spring.data.redis.host=redis"
       - "--spring.data.redis.port=6379"
+      - "--logging.loki.base-url=http://loki:3100"
     restart: on-failure
     healthcheck:
       test: "curl --fail --silent localhost:8080/actuator/health | grep UP || exit 1"
@@ -147,3 +169,5 @@ services:
         delay: 5s
         max_attempts: 3
         window: 120s
+
+#  TODO: Put other services

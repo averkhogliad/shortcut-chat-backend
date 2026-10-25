@@ -6,3 +6,8 @@ kafka:
 
 redis:
   host: redis-master
+
+logging:
+  loki:
+    enabled: true
+    baseUrl: http://loki:3100

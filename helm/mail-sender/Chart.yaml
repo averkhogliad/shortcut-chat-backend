@@ -2,4 +2,4 @@ apiVersion: v2
 name: mail-sender
 type: application
 version: 0.2.0 # Chart version
-appVersion: "0.0.3-SNAPSHOT" # App version
+appVersion: "0.0.5-SNAPSHOT" # App version

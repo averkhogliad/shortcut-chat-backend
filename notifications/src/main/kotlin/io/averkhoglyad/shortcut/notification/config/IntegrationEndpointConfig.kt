@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.support.WebClientAdapter
 import org.springframework.web.service.invoker.HttpExchangeAdapter
 import org.springframework.web.service.invoker.HttpServiceProxyFactory
+import org.springframework.web.service.invoker.createClient
 
 @Configuration
 class IntegrationEndpointConfig {
@@ -26,6 +27,6 @@ class IntegrationEndpointConfig {
     @Bean
     fun tokenEndpoint(http: HttpExchangeAdapter): ChatMembersEndpoint {
         return HttpServiceProxyFactory.builder().exchangeAdapter(http).build()
-            .createClient(ChatMembersEndpoint::class.java)
+            .createClient<ChatMembersEndpoint>()
     }
 }

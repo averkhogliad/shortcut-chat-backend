@@ -3,9 +3,6 @@ spring:
     name: messages-app
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/shortcut-chat
-    username: user
-    password: pass
     driver-class-name: org.postgresql.Driver
     hikari:
       connection-timeout: 30_000

@@ -15,6 +15,7 @@ import io.kotest.property.Arb
 import io.kotest.property.arbitrary.email
 import io.kotest.property.arbitrary.next
 import io.kotest.property.checkAll
+import io.micrometer.core.instrument.Counter
 import io.mockk.*
 import org.springframework.mail.MailSender
 import org.springframework.mail.SimpleMailMessage
@@ -27,6 +28,7 @@ class MailSendServiceTest : FreeSpec({
     val messageFactory = mockk<MailMessageFactory>()
     val fromEmail = Arb.email().next()
     val repository = mockk<MessageRepository>()
+    val sentMailCounter = mockk<Counter>()
 
     afterTest {
         clearAllMocks()
@@ -36,7 +38,8 @@ class MailSendServiceTest : FreeSpec({
         emailSender = emailSender,
         messageFactory = messageFactory,
         from = fromEmail,
-        repository = repository
+        repository = repository,
+        sentMailCounter = sentMailCounter,
     )
 
     "send" - {
@@ -57,12 +60,14 @@ class MailSendServiceTest : FreeSpec({
                 every { emailSender.send(any()) } just runs
                 every { repository.findById(any()) } returns null
                 every { repository.save(any()) } answers { args[0] as MessageEntity }
+                every { sentMailCounter.increment() } just runs
 
                 // when
                 service.send(eventId, message)
 
                 // then
                 verify { messageFactory.create(fromEmail, message) }
+                verify { sentMailCounter.increment() }
 
                 val mailMessageSlot = slot<SimpleMailMessage>()
                 verify { emailSender.send(capture(mailMessageSlot)) }
@@ -83,6 +88,7 @@ class MailSendServiceTest : FreeSpec({
 
                 // afterTest
                 clearAllMocks()
+                confirmVerified(messageFactory, emailSender, repository, sentMailCounter)
             }
         }
 

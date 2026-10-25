@@ -1,5 +1,5 @@
 apiVersion: v2
 name: users-app
 type: application
-version: 0.2.0 # Chart version
-appVersion: "0.0.3-SNAPSHOT" # App version
+version: 0.3.0 # Chart version
+appVersion: "0.0.5-SNAPSHOT" # App version

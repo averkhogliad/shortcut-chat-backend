@@ -45,7 +45,9 @@ class NotificationServiceImplTest : FreeSpec({
                 // when
                 val eventsDef = async { target.events().first() }
                 yield() // shift coroutine to execute async block and subscribe for events firstly
-                launch { target.handleEvent(givenEvent) } // emit event in other coroutine
+                launch { // emit event in other coroutine
+                    target.handleEvent(givenEvent)
+                }
                 val events = eventsDef.await() // waiting for result
 
                 // then

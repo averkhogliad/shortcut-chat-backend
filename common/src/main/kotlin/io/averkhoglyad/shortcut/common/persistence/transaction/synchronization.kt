@@ -54,8 +54,8 @@ private class SynchronizationBuilder : Synchronization {
         beforeCompletionFn = this.beforeCompletion,
         afterCommitFn = this.afterCommit,
         afterCompletionFn = this.afterCompletion,
-        afterSuccess = this.afterSuccess,
-        afterRollBack = this.afterRollBack
+        afterSuccessFn = this.afterSuccess,
+        afterRollBackFn = this.afterRollBack
     )
 
     override fun order(cb: () -> Int) {
@@ -120,8 +120,8 @@ private class TransactionSynchronizationImpl(
     private val beforeCompletionFn: Runnable?,
     private val afterCommitFn: Runnable?,
     private val afterCompletionFn: Consumer<Int>?,
-    private var afterSuccess: Runnable?,
-    private var afterRollBack: Runnable?
+    private val afterSuccessFn: Runnable?,
+    private val afterRollBackFn: Runnable?
 ) : TransactionSynchronization, Ordered {
 
     override fun getOrder(): Int {
@@ -155,8 +155,8 @@ private class TransactionSynchronizationImpl(
     override fun afterCompletion(status: Int) {
         afterCompletionFn?.invoke(status)
         when (status) {
-            TransactionSynchronization.STATUS_COMMITTED -> afterSuccess?.invoke()
-            TransactionSynchronization.STATUS_ROLLED_BACK -> afterRollBack?.invoke()
+            TransactionSynchronization.STATUS_COMMITTED -> afterSuccessFn?.invoke()
+            TransactionSynchronization.STATUS_ROLLED_BACK -> afterRollBackFn?.invoke()
         }
     }
 }

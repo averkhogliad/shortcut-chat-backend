@@ -1,4 +1,6 @@
 helm install users-pg-data ./mount-volume -f ./users.pg-data-volume.values.yaml
+helm install grafana-data ./mount-volume -f ./grafana.volume.values.yaml
+helm install prometheus-data ./mount-volume -f ./prometheus.volume.values.yaml
 
 
 helm install users-db ./postgres-db -f ./users.pg.values.yaml
@@ -31,3 +33,19 @@ kubectl port-forward svc/mail-sender 9099:8080
 helm install kafka-ui kafka-ui/kafka-ui -f ./kafka-ui.values.yaml
 
 kubectl port-forward svc/kafka-ui 3000:80
+
+
+helm install loki grafana/loki  -f ./loki.yaml
+
+
+helm install grafana grafana/grafana -f ./grafana.values.yaml
+
+kubectl port-forward svc/grafana 9000:80
+
+
+helm install prometheus prometheus-db -f .\prometheus.db.values.yaml
+
+#helm install prometheus prometheus-community/prometheus -f .\prometheus.values.yaml
+
+kubectl port-forward svc/grafana 9100:80
+

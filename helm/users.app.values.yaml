@@ -13,5 +13,10 @@ kafka:
 
 autoscaling:
   enabled: true
-  minReplicas: 3
-  maxReplicas: 9
+  minReplicas: 1
+  maxReplicas: 3
+
+logging:
+  loki:
+    enabled: true
+    baseUrl: http://loki:3100

@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "mail-sender.labels" . | nindent 4 }}
 data:
+  SPRING_PROFILES_ACTIVE: {{ include "users-app.activeProfiles" . | quote }}
   KAFKA_SERVER: {{ .Values.kafka.server | quote }}
   KAFKA_PORT: {{ .Values.kafka.port | quote }}
   {{- if .Values.smtp.enabled }}
@@ -28,4 +29,8 @@ data:
     spring.mail.password=${SMTP_PASSWORD}
     spring.mail.properties.mail.smtp.auth=true
     spring.mail.properties.mail.smtp.starttls.enable=true
+    {{- end }}
+
+    {{- if .Values.logging.loki.enabled }}
+    logging.loki.base-url={{ .Values.logging.loki.baseUrl }}
     {{- end }}

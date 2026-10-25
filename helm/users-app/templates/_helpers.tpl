@@ -50,5 +50,6 @@ app.kubernetes.io/name: {{ include "users-app.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-
-
+{{- define "users-app.activeProfiles" -}}
+{{- if .Values.logging.loki.enabled }}logging-loki{{- end }}
+{{- end }}

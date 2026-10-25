@@ -1,0 +1,16 @@
+fullnameOverride: prometheus
+
+global:
+  scrapeInterval: 5s
+  scrapeTimeout: 5s
+  evaluationInterval: 5s
+scrapeConfigs:
+  - job_name: apps_scraping
+    metrics_path: /actuator/prometheus
+    kubernetes_sd_configs:
+      - role: pod
+        selectors:
+          - role: "pod"
+            label: "app.kubernetes.io/name=users-app"
+          - role: "pod"
+            label: "app.kubernetes.io/name=mail-sender"

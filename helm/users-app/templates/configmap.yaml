@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "users-app.labels" . | nindent 4 }}
 data:
+  SPRING_PROFILES_ACTIVE: {{ include "users-app.activeProfiles" . | quote }}
   DB_HOST: {{ .Values.database.host | quote }}
   DB_PORT: {{ .Values.database.port | quote }}
   DB_NAME: {{ .Values.database.name | quote }}
@@ -16,3 +17,7 @@ data:
     spring.datasource.username=${DB_USERNAME}
     spring.datasource.password=${DB_PASSWORD}
     spring.kafka.bootstrap-servers=http://${KAFKA_SERVER}:${KAFKA_PORT}
+
+    {{- if .Values.logging.loki.enabled }}
+    logging.loki.base-url={{ .Values.logging.loki.baseUrl }}
+    {{- end }}

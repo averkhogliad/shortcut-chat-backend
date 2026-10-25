@@ -114,7 +114,6 @@ class MessageEndpointTest(
         }
 
         "POST /messages" - {
-//                val consumer = createKafkaConsumer()
             "creates message and publish event to Kafka" {
                 // given
                 val userId = "11111111-1111-1111-1111-111111111111"

@@ -213,7 +213,7 @@ class FlowTest : FreeSpec({
             }
         }
 
-        "handle element in borer of windows and put in one of the windows once only" {
+        "handle element in border of windows and put in one of the windows once only" {
             runTest {
                 // given
                 val events = listOf(1, 2)

@@ -91,6 +91,9 @@ affinity: {}
 
 ###
 
+spring:
+  activeProfiles: ''
+
 database:
   host: localhost
   port: 5432
@@ -101,3 +104,8 @@ database:
 kafka:
   server: localhost
   port: 9092
+
+logging:
+  loki:
+    enabled: false
+    baseUrl: http://loki:3100

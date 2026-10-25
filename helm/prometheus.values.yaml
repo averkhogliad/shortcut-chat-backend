@@ -1,0 +1,19 @@
+server:
+  global:
+    scrape_interval: 5s
+    scrape_timeout: 5s
+    evaluation_interval: 5s
+extraScrapeConfigs: |
+  - job_name: apps_scraping
+    metrics_path: /actuator/prometheus
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [ __meta_kubernetes_pod_name ]
+        action: keep
+        regex: 'users-app'
+        targets: ["users-app:8080"]
+#      - source_labels: [ __meta_kubernetes_pod_name ]
+#        action: keep
+#        regex: 'mail-sender'
+#        targets: ["mail-sender:8080"]

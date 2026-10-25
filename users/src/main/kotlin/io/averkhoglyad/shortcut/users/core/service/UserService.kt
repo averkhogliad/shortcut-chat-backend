@@ -1,6 +1,7 @@
 package io.averkhoglyad.shortcut.users.core.service
 
 import io.averkhoglyad.shortcut.common.data.EntityResult
+import io.averkhoglyad.shortcut.common.persistence.transaction.transaction
 import io.averkhoglyad.shortcut.common.util.slf4j
 import io.averkhoglyad.shortcut.users.core.converter.UserConverter
 import io.averkhoglyad.shortcut.users.core.model.User
@@ -9,6 +10,7 @@ import io.averkhoglyad.shortcut.users.core.persistence.repository.UserRepository
 import io.averkhoglyad.shortcut.users.core.service.message.SendCreatedUserNotificationMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.core.service.message.UserCreatedMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.outbox.OutboxService
+import io.micrometer.core.instrument.Counter
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.*
@@ -28,7 +30,8 @@ class UserServiceImpl(
     private val converter: UserConverter,
     private val userCreatedMessageFactory: UserCreatedMessageFactoryImpl,
     private val sendCreatedUserNotificationMessageFactory: SendCreatedUserNotificationMessageFactoryImpl,
-    private val messageOutboxService: OutboxService
+    private val messageOutboxService: OutboxService,
+    private val userRegistrationCounter: Counter,
 ): UserService {
 
     private val logger by slf4j()
@@ -56,6 +59,7 @@ class UserServiceImpl(
             .also { emitUserCreatedLifecycleEvent(it) }
             .also { emitUserCreatedStreamingEvent(it) }
             .also { sendNotification(it) }
+            .also { incrementUserRegistrationMetric() }
             .let { EntityResult.Success(it) }
     }
 
@@ -77,6 +81,14 @@ class UserServiceImpl(
 //        messageOutboxService.saveMessage(
 //            message = sendCreatedUserNotificationMessageFactory.create(user)
 //        )
+    }
+
+    private fun incrementUserRegistrationMetric() {
+        transaction {
+            afterCommit {
+                userRegistrationCounter.increment()
+            }
+        }
     }
 
     @Transactional

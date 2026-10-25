@@ -17,7 +17,10 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import io.kotest.property.arbitrary.next
+import io.micrometer.core.instrument.Counter
 import io.mockk.*
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import org.springframework.transaction.support.TransactionSynchronizationUtils.triggerAfterCommit
 import java.util.UUID.randomUUID
 
 class UserServiceTest : FreeSpec({
@@ -27,6 +30,7 @@ class UserServiceTest : FreeSpec({
     val userCreatedMessageFactory = mockk<UserCreatedMessageFactoryImpl>()
     val sendNotificationMessageFactory= mockk<SendCreatedUserNotificationMessageFactoryImpl>()
     val messageOutboxService= mockk<OutboxService>()
+    val userRegistrationCount= mockk<Counter>()
 
     afterTest {
         clearAllMocks()
@@ -37,7 +41,8 @@ class UserServiceTest : FreeSpec({
         converter = converter,
         userCreatedMessageFactory = userCreatedMessageFactory,
         sendCreatedUserNotificationMessageFactory = sendNotificationMessageFactory,
-        messageOutboxService = messageOutboxService
+        messageOutboxService = messageOutboxService,
+        userRegistrationCounter = userRegistrationCount,
     )
 
     "find" - {
@@ -79,6 +84,9 @@ class UserServiceTest : FreeSpec({
     }
 
     "create" - {
+        beforeEach { TransactionSynchronizationManager.initSynchronization() }
+        afterEach { TransactionSynchronizationManager.clearSynchronization() }
+        
         "returns Success response with created user" {
             // given
             val entity = userEntities.next()
@@ -93,9 +101,11 @@ class UserServiceTest : FreeSpec({
             every { userCreatedMessageFactory.create(any()) } returns userCreatedMessage
             every { sendNotificationMessageFactory.create(any()) } returns sendNotificationMessage
             every { messageOutboxService.saveMessage(any()) } just runs
+            every { userRegistrationCount.increment() } just runs
 
             // when
             val result = service.create(input)
+            triggerAfterCommit()
 
             // then
             result.shouldBeInstanceOf<Success<User>>()
@@ -112,8 +122,9 @@ class UserServiceTest : FreeSpec({
                 messageOutboxService.saveMessage(userCreatedMessage)
                 messageOutboxService.saveMessage(sendNotificationMessage)
             }
+            verify { userRegistrationCount.increment() }
 
-            confirmVerified(repository, converter, userCreatedMessageFactory, sendNotificationMessageFactory, messageOutboxService)
+            confirmVerified(repository, converter, userCreatedMessageFactory, sendNotificationMessageFactory, messageOutboxService, userRegistrationCount)
         }
     }
 

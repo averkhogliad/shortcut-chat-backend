@@ -1,0 +1,14 @@
+fullnameOverride: grafana-data
+hostPath:
+  path: /run/desktop/mnt/host/e/tmp/k8s/grafana/data
+storageCapacity: 8Gi
+
+claim:
+  enabled: true
+  accessModes:
+    - ReadOnlyMany
+    - ReadWriteOnce
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 8Gi

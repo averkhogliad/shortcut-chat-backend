@@ -11,14 +11,14 @@ fun betweenInclusive(fromInstant: Instant, toInstant: Instant): Matcher<Instant>
     object : Matcher<Instant> {
         override fun test(value: Instant): MatcherResult {
             return MatcherResult(
-                value >= fromInstant && value <= toInstant,
+                value in fromInstant..toInstant,
                 { "$value should be after or equal to $fromInstant and before or equal to $toInstant" },
                 { "$value should be after or equal to $fromInstant and before or equal to $toInstant" }
             )
         }
     }
 
-infix fun <A : Any?> A.shouldBeEqual(expected: A?): A? {
+infix fun <A> A.shouldBeEqual(expected: A?): A? {
     if (expected == null) this.shouldBeNull()
     else this should beEqual(expected)
     return this
