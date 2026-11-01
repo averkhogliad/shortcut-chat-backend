@@ -116,6 +116,48 @@ class MailSendServiceTest : FreeSpec({
             }
         }
 
+        "saves completed status when previous attempt failed" {
+            checkAll(emailMessages) { message ->
+                // given
+                val eventId = UUID.randomUUID().toString()
+                val mailMessageForSender = SimpleMailMessage()
+                val entity = MessageEntity(
+                    id = eventId,
+                    payload = message,
+                    status = Status.FAILED,
+                    createdAt = Instant.now(),
+                    updatedAt = Instant.now(),
+                    exception = Exception(),
+                )
+                every { messageFactory.create(any(), any()) } returns mailMessageForSender
+                every { emailSender.send(any()) } just runs
+                every { repository.findById(any()) } returns entity
+                every { repository.save(any()) } answers { args[0] as MessageEntity }
+                every { sentMailCounter.increment() } just runs
+
+                // when
+                service.send(eventId, message)
+
+                // then
+                verify { messageFactory.create(fromEmail, message) }
+
+                val mailMessageSlot = slot<SimpleMailMessage>()
+                verify { emailSender.send(capture(mailMessageSlot)) }
+                mailMessageSlot.captured shouldBeSameInstanceAs mailMessageForSender
+
+                val entitySlot = slot<MessageEntity>()
+                verify { repository.save(capture(entitySlot)) }
+                entitySlot.captured should {
+                    it.id shouldBeEqual eventId
+                    it.status shouldBeEqual Status.COMPLETED
+                    it.exception shouldBe null
+                }
+
+                // afterTest
+                clearAllMocks()
+            }
+        }
+
         "saves event as failed on exception" {
             checkAll(emailMessages) { message ->
                 // given

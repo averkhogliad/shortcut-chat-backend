@@ -20,6 +20,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType.APPLICATION_JSON
+import org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.kafka.test.utils.KafkaTestUtils
 import org.springframework.test.context.ActiveProfiles
@@ -27,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.RequestBuilder
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.*
@@ -111,6 +113,32 @@ class MessageEndpointTest(
                     .andExpect(jsonPath("$.data.length()").value(0))
                     .andExpect(jsonPath("$.next").isEmpty())
             }
+
+            "returns 400 for invalid chat id" {
+                // when
+                mvc.perform(
+                    get("/messages")
+                        .queryParam("chat", "invalid-uuid")
+                        .queryParam("pageSize", "1")
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+            }
+
+            "returns 400 for invalid last id" {
+                // given
+                val chatId = "22222222-2222-2222-2222-222222222222"
+
+                // when
+                mvc.perform(
+                    get("/messages")
+                        .queryParam("chat", chatId)
+                        .queryParam("pageSize", "1")
+                        .queryParam("lastId", "invalid-uuid")
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+            }
         }
 
         "POST /messages" - {
@@ -165,6 +193,41 @@ class MessageEndpointTest(
                     record.headers().lastHeaderAsString("X-Event-Name") shouldBe "MessagePublished"
                 }
 
+            }
+
+            "returns 400 for invalid user id header" {
+                // when
+                mvc.perform(
+                    post("/messages")
+                        .header("X-User-Id", "invalid-uuid")
+                        .contentType(APPLICATION_JSON)
+                        .content("""{"text":"text","chat":{"id":"22222222-2222-2222-2222-222222222222"}}""")
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+            }
+
+            "returns 400 for missing user id header" {
+                // when
+                mvc.perform(
+                    post("/messages")
+                        .contentType(APPLICATION_JSON)
+                        .content("""{"text":"text","chat":{"id":"22222222-2222-2222-2222-222222222222"}}""")
+                )
+                    .andExpect(status().is4xxClientError)
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+            }
+
+            "returns 400 for invalid chat id in body" {
+                // when
+                mvc.perform(
+                    post("/messages")
+                        .header("X-User-Id", "11111111-1111-1111-1111-111111111111")
+                        .contentType(APPLICATION_JSON)
+                        .content("""{"text":"text","chat":{"id":"invalid-uuid"}}""")
+                )
+                    .andExpect(status().isBadRequest)
+                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
             }
         }
     }
