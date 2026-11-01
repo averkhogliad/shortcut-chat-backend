@@ -26,6 +26,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <docker.image.prefix>shortcut</docker.image.prefix>
         <spring-boot.version>3.4.0</spring-boot.version>
+        <testcontainers.version>1.21.4</testcontainers.version>
         <shedlock.version>6.0.2</shedlock.version>
         <uuid.generator.version>5.1.0</uuid.generator.version>
         <tsid.generator.version>2.1.3</tsid.generator.version>
@@ -54,6 +55,13 @@
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-bom</artifactId>
                 <version>${kotlin.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>${testcontainers.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
