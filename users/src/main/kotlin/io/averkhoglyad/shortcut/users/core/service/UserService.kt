@@ -3,13 +3,14 @@ package io.averkhoglyad.shortcut.users.core.service
 import io.averkhoglyad.shortcut.common.data.EntityResult
 import io.averkhoglyad.shortcut.common.persistence.transaction.transaction
 import io.averkhoglyad.shortcut.common.util.slf4j
+import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
 import io.averkhoglyad.shortcut.users.core.converter.UserConverter
 import io.averkhoglyad.shortcut.users.core.model.User
 import io.averkhoglyad.shortcut.users.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.users.core.persistence.repository.UserRepository
+import io.averkhoglyad.shortcut.users.core.service.message.OutboxMessage
 import io.averkhoglyad.shortcut.users.core.service.message.SendCreatedUserNotificationMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.core.service.message.UserCreatedMessageFactoryImpl
-import io.averkhoglyad.shortcut.users.outbox.OutboxService
 import io.micrometer.core.instrument.Counter
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -30,7 +31,7 @@ class UserServiceImpl(
     private val converter: UserConverter,
     private val userCreatedMessageFactory: UserCreatedMessageFactoryImpl,
     private val sendCreatedUserNotificationMessageFactory: SendCreatedUserNotificationMessageFactoryImpl,
-    private val messageOutboxService: OutboxService,
+    private val outboxEmitter: OutboxEmitter,
     private val userRegistrationCounter: Counter,
 ): UserService {
 
@@ -64,23 +65,20 @@ class UserServiceImpl(
     }
 
     private fun sendNotification(user: User) {
-        messageOutboxService.saveMessage(
-            message = userCreatedMessageFactory.create(user)
-        )
+        emit(userCreatedMessageFactory.create(user))
     }
 
     private fun emitUserCreatedLifecycleEvent(user: User) {
-        messageOutboxService.saveMessage(
-            message = sendCreatedUserNotificationMessageFactory.create(user)
-        )
+        emit(sendCreatedUserNotificationMessageFactory.create(user))
     }
 
     private fun emitUserCreatedStreamingEvent(user: User) {
         // TODO: Add user creates streaming event
         logger.info("User ${user.id} created - streaming event")
-//        messageOutboxService.saveMessage(
-//            message = sendCreatedUserNotificationMessageFactory.create(user)
-//        )
+    }
+
+    private fun emit(message: OutboxMessage<*>) {
+        outboxEmitter.emit(message.type, message.version, message.key, message.body)
     }
 
     private fun incrementUserRegistrationMetric() {
@@ -108,16 +106,11 @@ class UserServiceImpl(
     private fun emitUserUpdatedLifecycleEvent(user: User) {
         // TODO: Add user updated lifecycle event
         logger.info("User ${user.id} updated - business event")
-//        val message = userUpdatedMessageFactory.create(user)
-//        messageOutboxService.saveMessage(message)
     }
 
     private fun emitUserUpdatedStreamingEvent(user: User) {
         // TODO: Add user updated streaming event
         logger.info("User ${user.id} updated - streaming event")
-//        messageOutboxService.saveMessage(
-//            message = sendCreatedUserNotificationMessageFactory.create(user)
-//        )
     }
 
     private fun User.toEntity(): UserEntity = converter.toEntity(this)

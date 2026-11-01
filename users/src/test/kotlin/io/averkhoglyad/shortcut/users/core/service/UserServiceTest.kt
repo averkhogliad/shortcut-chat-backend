@@ -2,14 +2,14 @@ package io.averkhoglyad.shortcut.users.core.service
 
 import io.averkhoglyad.shortcut.common.data.EntityResult.NotFound
 import io.averkhoglyad.shortcut.common.data.EntityResult.Success
+import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
 import io.averkhoglyad.shortcut.users.core.converter.UserConverter
 import io.averkhoglyad.shortcut.users.core.model.EmailMessage
 import io.averkhoglyad.shortcut.users.core.model.User
 import io.averkhoglyad.shortcut.users.core.persistence.repository.UserRepository
+import io.averkhoglyad.shortcut.users.core.service.message.OutboxMessage
 import io.averkhoglyad.shortcut.users.core.service.message.SendCreatedUserNotificationMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.core.service.message.UserCreatedMessageFactoryImpl
-import io.averkhoglyad.shortcut.users.outbox.OutboxMessage
-import io.averkhoglyad.shortcut.users.outbox.OutboxService
 import io.averkhoglyad.shortcut.users.test.gen.userEntities
 import io.averkhoglyad.shortcut.users.test.gen.users
 import io.kotest.core.spec.style.FreeSpec
@@ -29,7 +29,7 @@ class UserServiceTest : FreeSpec({
     val converter= mockk<UserConverter>()
     val userCreatedMessageFactory = mockk<UserCreatedMessageFactoryImpl>()
     val sendNotificationMessageFactory= mockk<SendCreatedUserNotificationMessageFactoryImpl>()
-    val messageOutboxService= mockk<OutboxService>()
+    val outboxEmitter = mockk<OutboxEmitter>(relaxed = true)
     val userRegistrationCount= mockk<Counter>()
 
     afterTest {
@@ -41,7 +41,7 @@ class UserServiceTest : FreeSpec({
         converter = converter,
         userCreatedMessageFactory = userCreatedMessageFactory,
         sendCreatedUserNotificationMessageFactory = sendNotificationMessageFactory,
-        messageOutboxService = messageOutboxService,
+        outboxEmitter = outboxEmitter,
         userRegistrationCounter = userRegistrationCount,
     )
 
@@ -56,7 +56,7 @@ class UserServiceTest : FreeSpec({
 
             // then
             result shouldBe NotFound
-            
+
             verify { repository.findById(id) }
             confirmVerified(repository)
         }
@@ -86,21 +86,25 @@ class UserServiceTest : FreeSpec({
     "create" - {
         beforeEach { TransactionSynchronizationManager.initSynchronization() }
         afterEach { TransactionSynchronizationManager.clearSynchronization() }
-        
-        "returns Success response with created user" {
+
+        "returns Success response with created user and emits outbox messages" {
             // given
             val entity = userEntities.next()
             val input = users.next().copy(id = null)
             val output = users.next()
-            val sendNotificationMessage = mockk<OutboxMessage<EmailMessage>>()
-            val userCreatedMessage = mockk<OutboxMessage<User>>()
+            val notificationBody = EmailMessage(
+                to = listOf(output.email),
+                subject = "Welcome ${output.name}!",
+                body = "Hello ${output.name}. Welcome to our system",
+            )
+            val notificationMessage = OutboxMessage("SendCreatedUserNotification", "v1", null, notificationBody)
+            val userCreatedMessage = OutboxMessage("UserCreated", "v1", null, output)
 
             every { repository.save(any()) } returns entity
             every { converter.toEntity(any()) } returns entity
             every { converter.fromEntity(any()) } returns output
             every { userCreatedMessageFactory.create(any()) } returns userCreatedMessage
-            every { sendNotificationMessageFactory.create(any()) } returns sendNotificationMessage
-            every { messageOutboxService.saveMessage(any()) } just runs
+            every { sendNotificationMessageFactory.create(any()) } returns notificationMessage
             every { userRegistrationCount.increment() } just runs
 
             // when
@@ -118,13 +122,44 @@ class UserServiceTest : FreeSpec({
             }
             verify { userCreatedMessageFactory.create(output) }
             verify { sendNotificationMessageFactory.create(output) }
-            verifyAll {
-                messageOutboxService.saveMessage(userCreatedMessage)
-                messageOutboxService.saveMessage(sendNotificationMessage)
+
+            val notificationType = slot<String>()
+            val notificationVersion = slot<String>()
+            val notificationKey = slot<String?>()
+            val notificationPayload = slot<Any>()
+            val userCreatedType = slot<String>()
+            val userCreatedVersion = slot<String>()
+            val userCreatedKey = slot<String?>()
+            val userCreatedPayload = slot<Any>()
+
+            verifyOrder {
+                outboxEmitter.emit(
+                    capture(notificationType),
+                    capture(notificationVersion),
+                    captureNullable(notificationKey),
+                    capture(notificationPayload),
+                )
+                outboxEmitter.emit(
+                    capture(userCreatedType),
+                    capture(userCreatedVersion),
+                    captureNullable(userCreatedKey),
+                    capture(userCreatedPayload),
+                )
             }
+
+            notificationType.captured shouldBe "SendCreatedUserNotification"
+            notificationVersion.captured shouldBe "v1"
+            notificationKey.captured shouldBe null
+            notificationPayload.captured shouldBeSameInstanceAs notificationBody
+
+            userCreatedType.captured shouldBe "UserCreated"
+            userCreatedVersion.captured shouldBe "v1"
+            userCreatedKey.captured shouldBe null
+            userCreatedPayload.captured shouldBeSameInstanceAs output
+
             verify { userRegistrationCount.increment() }
 
-            confirmVerified(repository, converter, userCreatedMessageFactory, sendNotificationMessageFactory, messageOutboxService, userRegistrationCount)
+            confirmVerified(repository, converter, userCreatedMessageFactory, sendNotificationMessageFactory, outboxEmitter, userRegistrationCount)
         }
     }
 

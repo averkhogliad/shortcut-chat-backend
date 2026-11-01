@@ -2,7 +2,6 @@ package io.averkhoglyad.shortcut.users.core.service.message
 
 import io.averkhoglyad.shortcut.users.core.model.EmailMessage
 import io.averkhoglyad.shortcut.users.core.model.User
-import io.averkhoglyad.shortcut.users.outbox.OutboxMessage
 import org.springframework.stereotype.Component
 
 @Component

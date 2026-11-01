@@ -6,4 +6,14 @@
     <include file="001__Create-Users-table.xml" relativeToChangelogFile="true"/>
     <include file="002__Create-MessageOutbox-table.xml" relativeToChangelogFile="true"/>
 
+    <changeSet id="tx-outbox-drop-legacy-message-outbox" author="tx-outbox">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="message_outbox"/>
+        </preConditions>
+        <dropTable tableName="message_outbox"/>
+    </changeSet>
+
+    <include file="classpath:io/averkhoglyad/shortcut/outbox/migrations/message-outbox-changelog.xml"
+             relativeToChangelogFile="false"/>
+
 </databaseChangeLog>

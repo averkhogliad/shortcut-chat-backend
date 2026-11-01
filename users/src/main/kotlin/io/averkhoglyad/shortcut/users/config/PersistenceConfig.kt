@@ -7,11 +7,16 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.annotation.Order
 import org.springframework.data.jdbc.repository.config.EnableJdbcAuditing
 import org.springframework.data.relational.auditing.RelationalAuditingCallback
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.simple.JdbcClient
 import java.util.*
 
 @Configuration
 @EnableJdbcAuditing
 class PersistenceConfig {
+
+    @Bean
+    fun jdbcClient(jdbcTemplate: JdbcTemplate): JdbcClient = JdbcClient.create(jdbcTemplate)
 
     @Bean
     @Order(RelationalAuditingCallback.AUDITING_ORDER + 10)
