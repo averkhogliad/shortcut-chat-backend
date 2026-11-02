@@ -7,8 +7,8 @@ import io.averkhoglyad.shortcut.chat.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.chat.core.persistence.repository.ChatRepository
 import io.averkhoglyad.shortcut.chat.core.persistence.repository.UserRepository
 import io.averkhoglyad.shortcut.chat.core.service.message.MessageFactory
-import io.averkhoglyad.shortcut.chat.outbox.OutboxService
 import io.averkhoglyad.shortcut.common.data.EntityResult
+import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,7 +31,7 @@ interface ChatService {
 class ChatServiceImpl(
     private val converter: ChatConverter,
     private val repository: ChatRepository,
-    private val outboxService: OutboxService,
+    private val outboxEmitter: OutboxEmitter,
     private val chatCreatedMessageFactory: MessageFactory<ChatDetails, ChatCreatedEvent>,
     private val userRepository: UserRepository,
 ) : ChatService {
@@ -78,7 +78,8 @@ class ChatServiceImpl(
     }
 
     private fun emitChatCreatedLifecycleEvent(chat: ChatDetails) {
-        outboxService.save(chatCreatedMessageFactory.create(chat))
+        chatCreatedMessageFactory.create(chat)
+            .let { outboxEmitter.emit(it.type, it.version, it.key, it.body) }
     }
 
     private fun ChatRequest.toEntity(): ChatEntity = converter.toEntity(this)

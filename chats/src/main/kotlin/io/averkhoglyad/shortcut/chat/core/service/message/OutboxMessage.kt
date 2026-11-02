@@ -1,4 +1,4 @@
-package io.averkhoglyad.shortcut.chat.outbox
+package io.averkhoglyad.shortcut.chat.core.service.message
 
 data class OutboxMessage<B>(
     val type: String,

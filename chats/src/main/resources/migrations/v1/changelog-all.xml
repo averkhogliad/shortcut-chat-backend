@@ -8,4 +8,14 @@
     <include file="003__Create-Member-table.xml" relativeToChangelogFile="true"/>
     <include file="004__Create-MessageOutbox-table.xml" relativeToChangelogFile="true"/>
 
+    <changeSet id="1745264310990-4" author="a.v.verkhoglyad">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="message_outbox"/>
+        </preConditions>
+        <dropTable tableName="message_outbox"/>
+    </changeSet>
+
+    <include file="classpath:io/averkhoglyad/shortcut/outbox/migrations/message-outbox-changelog.xml"
+             relativeToChangelogFile="false"/>
+
 </databaseChangeLog>

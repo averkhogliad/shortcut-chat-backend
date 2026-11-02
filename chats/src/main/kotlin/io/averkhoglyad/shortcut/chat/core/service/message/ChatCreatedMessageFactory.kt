@@ -4,7 +4,6 @@ import io.averkhoglyad.shortcut.chat.core.model.ChatCreatedEvent
 import io.averkhoglyad.shortcut.chat.core.model.ChatDetails
 import io.averkhoglyad.shortcut.chat.core.model.User
 import io.averkhoglyad.shortcut.chat.core.model.UserRef
-import io.averkhoglyad.shortcut.chat.outbox.OutboxMessage
 import org.springframework.stereotype.Component
 
 @Component

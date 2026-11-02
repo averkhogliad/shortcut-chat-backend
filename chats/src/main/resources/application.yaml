@@ -38,16 +38,37 @@ scheduler:
   default-lock:
     lock-at-least-for: PT1M
     lock-at-most-for: PT10M
-  message-outbox-handler:
-    initial-delay: PT10S
-    fixed-delay: PT1S
-    lock-at-least-for: ${scheduler.message-outbox-handler.fixed-delay}
-    lock-at-most-for: PT5M
-  message-outbox-cleaner:
-    cron: 0 0 6 * * *
-    lock-at-least-for: PT1M
-    lock-at-most-for: PT12H
-    valid-period: P10D
+
+tx-outbox:
+  enabled: true
+  channels:
+    - name: chat-lifecycle
+      topic: ChatLifecycle
+  routes:
+    - type: ChatCreated
+      channel: chat-lifecycle
+      event-name: ChatCreated
+  relay:
+    batch-size: 100
+    max-loops-per-run: 10
+    schedule:
+      mode: fixed-delay
+      fixed-delay: PT5S
+      initial-delay: PT1S
+  lease:
+    duration: PT30S
+  retry:
+    max-attempts: 10
+    initial-delay: PT5S
+    multiplier: 2
+    max-delay: PT5M
+  cleanup:
+    enabled: true
+    published-retention: P7D
+    dead-retention: P30D
+    schedule:
+      mode: cron
+      cron: "0 */30 * * * *"
 
 management:
   endpoints:

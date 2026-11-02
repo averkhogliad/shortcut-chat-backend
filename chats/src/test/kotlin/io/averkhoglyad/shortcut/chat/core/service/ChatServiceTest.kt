@@ -12,10 +12,10 @@ import io.averkhoglyad.shortcut.chat.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.chat.core.persistence.repository.ChatRepository
 import io.averkhoglyad.shortcut.chat.core.persistence.repository.UserRepository
 import io.averkhoglyad.shortcut.chat.core.service.message.MessageFactory
-import io.averkhoglyad.shortcut.chat.outbox.OutboxMessage
-import io.averkhoglyad.shortcut.chat.outbox.OutboxService
+import io.averkhoglyad.shortcut.chat.core.service.message.OutboxMessage
 import io.averkhoglyad.shortcut.common.data.EntityResult.NotFound
 import io.averkhoglyad.shortcut.common.data.EntityResult.Success
+import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -36,13 +36,13 @@ class ChatServiceTest : FreeSpec({
 
     val converter = mockk<ChatConverter>()
     val repository = mockk<ChatRepository>()
-    val outboxService = mockk<OutboxService>()
+    val outboxEmitter = mockk<OutboxEmitter>()
     val messageFactory = mockk<MessageFactory<ChatDetails, ChatCreatedEvent>>()
     val userRepository = mockk<UserRepository>()
     val target = ChatServiceImpl(
         converter = converter,
         repository = repository,
-        outboxService = outboxService,
+        outboxEmitter = outboxEmitter,
         chatCreatedMessageFactory = messageFactory,
         userRepository = userRepository,
     )
@@ -159,7 +159,7 @@ class ChatServiceTest : FreeSpec({
             every { userRepository.findByIdIsIn(any()) } returns memberEntities
             every { converter.toDetails(saved, memberEntities) } returns details
             every { messageFactory.create(details) } returns outboxMessage
-            every { outboxService.save(any()) } just Runs
+            every { outboxEmitter.emit(any(), any(), any(), any()) } just Runs
 
             // when
             val result = target.create(request)
@@ -168,9 +168,17 @@ class ChatServiceTest : FreeSpec({
             result.shouldBeInstanceOf<Success<ChatDetails>>()
             result.entity shouldBeSameInstanceAs details
 
-            val savedMessage = slot<OutboxMessage<*>>()
-            verify(exactly = 1) { outboxService.save(capture(savedMessage)) }
-            savedMessage.captured shouldBeSameInstanceAs outboxMessage
+            val type = slot<String>()
+            val version = slot<String>()
+            val key = slot<String>()
+            val body = slot<Any>()
+            verify(exactly = 1) {
+                outboxEmitter.emit(capture(type), capture(version), capture(key), capture(body))
+            }
+            type.captured shouldBe outboxMessage.type
+            version.captured shouldBe outboxMessage.version
+            key.captured shouldBe outboxMessage.key
+            body.captured shouldBeSameInstanceAs outboxMessage.body
         }
     }
 
