@@ -17,7 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled
     havingValue = "true",
     matchIfMissing = true,
 )
-class TxOutboxScheduleConfig {
+open class TxOutboxScheduleConfig {
 
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(
@@ -26,7 +26,7 @@ class TxOutboxScheduleConfig {
         havingValue = "fixed-delay",
         matchIfMissing = true,
     )
-    class RelayFixedDelayScheduleConfig(
+    open class RelayFixedDelayScheduleConfig(
         private val relay: OutboxRelay,
     ) {
 
@@ -42,7 +42,7 @@ class TxOutboxScheduleConfig {
             lockAtLeastFor = "\${tx-outbox.relay.schedule.lock-at-least-for:PT1S}",
             lockAtMostFor = "\${tx-outbox.relay.schedule.lock-at-most-for:PT10M}",
         )
-        fun runRelay() {
+        open fun runRelay() {
             runCatching { relay.runCycle() }
                 .onFailure { logger.error("Error during outbox-relay scheduled execution", it) }
         }
@@ -54,7 +54,7 @@ class TxOutboxScheduleConfig {
         name = ["mode"],
         havingValue = "cron",
     )
-    class RelayCronScheduleConfig(
+    open class RelayCronScheduleConfig(
         private val relay: OutboxRelay,
     ) {
 
@@ -70,7 +70,7 @@ class TxOutboxScheduleConfig {
             lockAtLeastFor = "\${tx-outbox.relay.schedule.lock-at-least-for:PT1S}",
             lockAtMostFor = "\${tx-outbox.relay.schedule.lock-at-most-for:PT10M}",
         )
-        fun runRelay() {
+        open fun runRelay() {
             runCatching { relay.runCycle() }
                 .onFailure { logger.error("Error during outbox-relay scheduled execution", it) }
         }
@@ -83,7 +83,7 @@ class TxOutboxScheduleConfig {
         havingValue = "true",
         matchIfMissing = true,
     )
-    class CleanupScheduleConfig {
+    open class CleanupScheduleConfig {
 
         @Configuration(proxyBeanMethods = false)
         @ConditionalOnProperty(
@@ -92,7 +92,7 @@ class TxOutboxScheduleConfig {
             havingValue = "cron",
             matchIfMissing = true,
         )
-        class CleanupCronScheduleConfig(
+        open class CleanupCronScheduleConfig(
             private val cleaner: OutboxCleaner,
         ) {
 
@@ -108,7 +108,7 @@ class TxOutboxScheduleConfig {
                 lockAtLeastFor = "\${tx-outbox.cleanup.schedule.lock-at-least-for:PT1M}",
                 lockAtMostFor = "\${tx-outbox.cleanup.schedule.lock-at-most-for:PT12H}",
             )
-            fun runCleanup() {
+            open fun runCleanup() {
                 runCatching { cleaner.clean() }
                     .onFailure { logger.error("Error during outbox-cleanup scheduled execution", it) }
             }
@@ -120,7 +120,7 @@ class TxOutboxScheduleConfig {
             name = ["mode"],
             havingValue = "fixed-delay",
         )
-        class CleanupFixedDelayScheduleConfig(
+        open class CleanupFixedDelayScheduleConfig(
             private val cleaner: OutboxCleaner,
         ) {
 
@@ -136,7 +136,7 @@ class TxOutboxScheduleConfig {
                 lockAtLeastFor = "\${tx-outbox.cleanup.schedule.lock-at-least-for:PT1M}",
                 lockAtMostFor = "\${tx-outbox.cleanup.schedule.lock-at-most-for:PT12H}",
             )
-            fun runCleanup() {
+            open fun runCleanup() {
                 runCatching { cleaner.clean() }
                     .onFailure { logger.error("Error during outbox-cleanup scheduled execution", it) }
             }

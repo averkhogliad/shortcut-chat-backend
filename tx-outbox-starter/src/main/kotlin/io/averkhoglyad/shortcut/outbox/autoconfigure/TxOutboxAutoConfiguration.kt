@@ -21,6 +21,8 @@ import org.springframework.boot.autoconfigure.AutoConfiguration
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.autoconfigure.jackson.JacksonAutoConfiguration
+import org.springframework.boot.autoconfigure.jdbc.JdbcClientAutoConfiguration
 import org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -30,7 +32,13 @@ import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.kafka.core.KafkaTemplate
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
 
-@AutoConfiguration(after = [KafkaAutoConfiguration::class])
+@AutoConfiguration(
+    after = [
+        JdbcClientAutoConfiguration::class,
+        JacksonAutoConfiguration::class,
+        KafkaAutoConfiguration::class,
+    ]
+)
 @EnableConfigurationProperties(TxOutboxProperties::class)
 class TxOutboxAutoConfiguration {
 

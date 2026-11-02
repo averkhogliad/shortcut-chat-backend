@@ -4,7 +4,7 @@ import io.averkhoglyad.shortcut.outbox.persistence.OutboxDao
 import org.springframework.transaction.annotation.Propagation.MANDATORY
 import org.springframework.transaction.annotation.Transactional
 
-class OutboxWriterImpl(
+open class OutboxWriterImpl(
     private val dao: OutboxDao,
 ) : OutboxWriter {
 
