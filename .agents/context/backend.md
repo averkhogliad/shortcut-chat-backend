@@ -10,20 +10,22 @@
 |---|---|---|---|---|
 | `common` | `io.averkhoglyad.shortcut.common` | — | `EntityResult`, ID callback, transaction callbacks, web handler, flow/log utils | — |
 | `common-test` | `io.averkhoglyad.shortcut.common.test` | — | `SpringAwareKotestConfig`, `SqlTestCaseExtension`, matchers | — |
+| `tx-outbox` | `io.averkhoglyad.shortcut.outbox` | — | доменно-нейтральное ядро outbox: `OutboxWriter`, `OutboxRelay`, `OutboxCleaner`, `OutboxDao` (`JdbcClient`), SPI `OutboxPublisher`, артефакты схемы `message_outbox` | — |
+| `tx-outbox-starter` | `io.averkhoglyad.shortcut.outbox.autoconfigure` | — | автоконфигурация outbox: properties, роутер, провайдер заголовков, `OutboxEmitter`, дефолтный Kafka-publisher, scheduler, метрики | — |
 | `users` | `io.averkhoglyad.shortcut.users` | `UsersApp` | REST `/users`, outbox publisher | PostgreSQL, outbox |
 | `chats` | `io.averkhoglyad.shortcut.chat` | `ChatApp` | REST `/chats`, `/members`, outbox publisher | PostgreSQL, outbox |
 | `messages` | `io.averkhoglyad.shortcut.message` | `MessageApp` | REST `/messages`, публикация после commit | PostgreSQL |
 | `notifications` | `io.averkhoglyad.shortcut.notification` | `NotificationApp` | Kafka consumer, SSE, HTTP-клиент к `chats` | нет |
 | `mail-sender` | `io.averkhoglyad.shortcut.mail.sender` | `MailSenderApp` | Kafka consumer, отправка почты | Redis |
 
-`tx-outbox/` — пустой каталог, в Maven-модули не входит.
+`tx-outbox` и `tx-outbox-starter` — библиотечные модули, не сервисы, БД не владеют.
 
 ## Точки входа
 
 - REST: `UserController` `/users`; `ChatController` `/chats`; `ChatMembersController` `/members`; `MessageController` `/messages`.
 - Kafka: `SendCommandHandler` (`MailerCommands`); `ChatLifecycleEventsHandler` (`ChatLifecycle`, тип события по `X-Event-Name`).
 - SSE: `GET /subscribe?userId=...` — `WebConfig` и `NotificationSubscriptionHandler`.
-- Outbox jobs: `ScheduleConfig` в `users` и `chats` (`message-outbox-handler`, `message-outbox-cleaner`, профиль `!test`), `OutboxHandler`, `OutboxCleaner`.
+- Outbox jobs: `tx-outbox-starter` (`TxOutboxScheduleConfig`, relay и cleanup на `outboxTaskScheduler`, профиль `!test`); сервисы дают только `LockProvider` в своём `ScheduleConfig`.
 - Тесты: `<module>/src/test/kotlin`; фикстуры `src/test/resources/it/**` и `src/test/resources/repository/**` в `chats`, `messages`, `notifications`; генераторы `gen.kt` в `users`, `chats`, `messages`, `mail-sender`.
 
 ## Взаимодействия
@@ -38,7 +40,7 @@
 - HTTP: `notifications` вызывает `chats` через `GET /members?chatId=...`; адрес — `integrations.chat-service.base-url`.
 - Redis: `mail-sender` хранит состояние идемпотентности по `X-Event-Id`, TTL 30 дней.
 - SSE: `notifications` отдаёт live-поток из `MutableSharedFlow` без replay. Модель live-only; требование к replay не зафиксировано, решение — отдельно.
-- Outbox: `users`/`chats` пишут событие в таблицу в транзакции агрегата; scheduler отправляет его и сразу помечает published; подтверждения Kafka handler не ждёт. Это известный риск; решение о гарантиях публикации — отдельно.
+- Outbox: `users`/`chats` пишут событие в таблицу в транзакции агрегата через `OutboxEmitter`; `tx-outbox-starter` публикует его через claim/lease с подтверждением Kafka, повторяет до `DEAD` с backoff, восстанавливает просроченные lease и чистит терминальные записи по retention. Доставка at-least-once, consumer'ы должны быть идемпотентны.
 
 ## Текущее состояние и ограничения
 
@@ -48,7 +50,7 @@
 
 - авторизации нет;
 - consumer `UserLifecycle` отсутствует; consumer'ов в `chats`/`messages` нет; синхронизация read-моделей не реализована, критерии приёмки не определены;
-- `messages` может потерять событие после commit; outbox не гарантирует подтверждённую доставку. Это известный риск, решение о гарантиях публикации — отдельно;
+- `messages` может потерять событие после commit — там outbox нет, доставка не гарантирована; для `users`/`chats` outbox даёт at-least-once, возможны дубли, consumer'ы должны быть идемпотентны;
 - `mail-sender` при ошибке сохраняет `FAILED` и не пробрасывает исключение; retry/DLQ нет. Требования к retry и обработке ошибок не зафиксированы, решение — отдельно;
 - `notifications` не имеет собственной БД; в POM остались Liquibase/PostgreSQL, в `src/test/resources` — SQL-фикстуры. Проверка этих зависимостей и фикстур — отдельная задача;
 - `common` POM не объявляет `test-compile`; `FlowTest` — предполагаемый дефект тестовой инфраструктуры по статическому аудиту; сборка не запускалась; рабочим покрытием не является;
@@ -56,13 +58,12 @@
 - CI, линтеров, форматтеров и integration-test профиля нет;
 - в `docker/docker-compose.yml`, Helm и K8s развёрнуты только `users` и `mail-sender`;
 - `PageResponse` не используется; `hypersistence-tsid` объявлен в `dependencyManagement`, но в коде не используется;
-- outbox, Kafka-заголовки, `EndpointExceptionAdvice` и response-классы дублируются между модулями;
+- outbox и Kafka-заголовки вынесены в `tx-outbox`/`tx-outbox-starter`; `EndpointExceptionAdvice` и response-классы дублируются между модулями;
 - Spring Security, JPA/Hibernate, MapStruct, OpenAPI и schema registry не подключены.
 
 Намерения, не реализованные в коде:
 
-- синхронизация read-моделей `users`/`chats` (заявлена в `module-boundaries.md` как будущая задача; критерии приёмки не определены);
-- вынос outbox в `tx-outbox` (зафиксирован в TODO и пустом каталоге).
+- синхронизация read-моделей `users`/`chats` (заявлена в `module-boundaries.md` как будущая задача; критерии приёмки не определены).
 
 ## Ссылки на источники
 

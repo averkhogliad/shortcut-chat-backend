@@ -35,10 +35,9 @@ Services SHALL apply `@Transactional` at the service layer. Post-commit actions 
 
 ## Current Behavior
 
-These are observed current behaviors, not requirements. Decisions about guarantees, retries, and replay are pending.
+These are observed current behaviors, not requirements.
 
 - `messages` publishes `MessagePublished` after commit without an outbox. Delivery is not guaranteed.
-- The outbox handler marks a record as published without waiting for a Kafka acknowledgement. This is a known technical risk.
 - `mail-sender` stores `FAILED` and does not rethrow the exception. Retry and DLQ are not implemented.
 - `notifications` exposes a live-only SSE stream without replay.
 - Synchronization of `users` read models in `chats` and `messages` is not implemented.
