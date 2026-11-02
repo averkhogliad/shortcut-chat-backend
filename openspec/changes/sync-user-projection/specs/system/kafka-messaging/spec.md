@@ -1,0 +1,88 @@
+# Spec Delta
+
+## MODIFIED Requirements
+
+### Requirement: Topic and event inventory
+
+The system SHALL use the following topics and events:
+
+| Topic | Producer | Event name | Consumer |
+|---|---|---|---|
+| `MailerCommands` | `users` | `SendEmail` (outbox type `SendCreatedUserNotification`) | `mail-sender` |
+| `UserLifecycle` | `users` | `UserCreated` | `chats`, `messages` |
+| `UserLifecycle` | `users` | `UserUpdated` (outbox type `UserUpdated`) | `chats`, `messages` |
+| `UserLifecycle` | `users` | `UserDeleted` (outbox type `UserDeleted`) | `chats`, `messages` |
+| `ChatLifecycle` | `chats` | `ChatCreated` | `notifications` |
+| `ChatLifecycle` | `messages` | `MessagePublished` | `notifications` |
+
+#### Scenario: New event type
+
+- **WHEN** a new event type is added
+- **THEN** its producer and every affected consumer SHALL be updated in the same task.
+
+#### Scenario: User lifecycle event has consumers
+
+- **WHEN** `users` publishes any `UserLifecycle` event
+- **THEN** `chats` and `messages` SHALL consume it to maintain their local user projection.
+
+### Requirement: Event headers
+
+Every produced event SHALL carry these headers:
+
+- `X-Event-Id`
+- `X-Event-Name`
+- `X-Event-Version`
+- `X-Published-At`
+- `X-Published-By`
+
+#### Scenario: Consumer dispatch
+
+- **WHEN** `notifications` receives a `ChatLifecycle` record
+- **THEN** it SHALL select the payload type from `X-Event-Name`.
+
+#### Scenario: User lifecycle consumer dispatch
+
+- **WHEN** `chats` or `messages` receives a `UserLifecycle` record
+- **THEN** it SHALL select the payload type from `X-Event-Name` and dispatch to the matching handler (`UserCreated`, `UserUpdated`, or `UserDeleted`).
+
+### Requirement: Event payloads
+
+The system SHALL use the following payload structures:
+
+| Event | Payload |
+|---|---|
+| `UserCreated` | `User { id, name, email }` |
+| `UserUpdated` | `User { id, name, email }` |
+| `UserDeleted` | `UserDeleted { id }` |
+| `SendEmail` | `EmailMessage { to, subject, body }` |
+| `ChatCreated` | `ChatCreatedEvent { id, name, owner, members, createdAt }` |
+| `MessagePublished` | `Message { id, text, chat, author, createdAt }` |
+
+#### Scenario: Chat created
+
+- **WHEN** `ChatCreated` is published
+- **THEN** the payload SHALL contain the chat id, name, owner, members, and creation time.
+
+#### Scenario: User updated payload
+
+- **WHEN** `UserUpdated` is published
+- **THEN** the payload SHALL contain the user id, name, and email and SHALL NOT contain soft-delete markers.
+
+#### Scenario: User deleted payload
+
+- **WHEN** `UserDeleted` is published
+- **THEN** the payload SHALL contain only the user id.
+
+### Requirement: Serialization per producer
+
+`users` and `chats` SHALL publish JSON bytes produced by the outbox serializer. `messages` SHALL publish JSON with `spring.json.use.type.headers=false`. `mail-sender` SHALL consume JSON with type headers disabled. `notifications` SHALL resolve the payload type from `X-Event-Name`. `chats` and `messages` SHALL resolve the `UserLifecycle` payload type from `X-Event-Name` with JSON type headers disabled.
+
+#### Scenario: Consume a message event
+
+- **WHEN** `notifications` receives a record with `X-Event-Name=MessagePublished`
+- **THEN** it SHALL deserialize the payload as `MessagePublished`.
+
+#### Scenario: Consume a user lifecycle event
+
+- **WHEN** `chats` or `messages` receives a `UserLifecycle` record with `X-Event-Name=UserUpdated`
+- **THEN** it SHALL deserialize the payload as `UserUpdated` without using JSON type headers.
