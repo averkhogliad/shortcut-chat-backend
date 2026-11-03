@@ -1,0 +1,181 @@
+package io.averkhoglyad.shortcut.message.core.service
+
+import io.averkhoglyad.shortcut.message.core.model.UserCreatedPayload
+import io.averkhoglyad.shortcut.message.core.model.UserDeletedPayload
+import io.averkhoglyad.shortcut.message.core.model.UserUpdatedPayload
+import io.averkhoglyad.shortcut.message.core.persistence.entity.UserEntity
+import io.averkhoglyad.shortcut.message.core.persistence.repository.UserRepository
+import io.kotest.core.spec.style.FreeSpec
+import io.kotest.matchers.shouldBe
+import io.mockk.clearAllMocks
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
+import java.time.Instant
+import java.util.*
+
+class UserProjectionServiceTest : FreeSpec({
+
+    val repository = mockk<UserRepository>()
+    val service = UserProjectionService(repository)
+
+    afterTest {
+        clearAllMocks()
+    }
+
+    "applyCreated" - {
+        "inserts a new projection" {
+            val id = UUID.randomUUID()
+            val eventTime = Instant.now()
+            val payload = UserCreatedPayload(id, "name", "email@e.com")
+
+            val slot = slot<UserEntity>()
+            every { repository.findById(id) } returns null
+            every { repository.save(capture(slot)) } returns UserEntity()
+
+            service.applyCreated(id, eventTime, payload)
+
+            slot.captured.id shouldBe id
+            slot.captured.externalId shouldBe id.toString()
+            slot.captured.name shouldBe "name"
+            slot.captured.email shouldBe "email@e.com"
+            slot.captured.lastSyncAt shouldBe eventTime
+            slot.captured.deleted shouldBe false
+        }
+
+        "updates existing projection when event is newer" {
+            val id = UUID.randomUUID()
+            val oldTime = Instant.parse("2025-01-01T00:00:00Z")
+            val newTime = Instant.parse("2025-02-01T00:00:00Z")
+            val payload = UserCreatedPayload(id, "new", "new@e.com")
+            val existing = UserEntity().apply {
+                this.id = id
+                this.externalId = id.toString()
+                this.name = "old"
+                this.email = "old@e.com"
+                this.lastSyncAt = oldTime
+                this.deleted = true
+            }
+
+            val slot = slot<UserEntity>()
+            every { repository.findById(id) } returns existing
+            every { repository.save(capture(slot)) } returns existing
+
+            service.applyCreated(id, newTime, payload)
+
+            slot.captured.name shouldBe "new"
+            slot.captured.email shouldBe "new@e.com"
+            slot.captured.lastSyncAt shouldBe newTime
+            slot.captured.deleted shouldBe false
+        }
+
+        "ignores an older event" {
+            val id = UUID.randomUUID()
+            val oldTime = Instant.parse("2025-01-01T00:00:00Z")
+            val olderTime = Instant.parse("2024-12-01T00:00:00Z")
+            val payload = UserCreatedPayload(id, "new", "new@e.com")
+            val existing = UserEntity().apply {
+                this.id = id
+                this.lastSyncAt = oldTime
+            }
+
+            every { repository.findById(id) } returns existing
+
+            service.applyCreated(id, olderTime, payload)
+
+            verify(exactly = 0) { repository.save(any()) }
+        }
+
+        "ignores an event with equal event time" {
+            val id = UUID.randomUUID()
+            val eventTime = Instant.parse("2025-01-01T00:00:00Z")
+            val payload = UserCreatedPayload(id, "new", "new@e.com")
+            val existing = UserEntity().apply {
+                this.id = id
+                this.lastSyncAt = eventTime
+            }
+
+            every { repository.findById(id) } returns existing
+
+            service.applyCreated(id, eventTime, payload)
+
+            verify(exactly = 0) { repository.save(any()) }
+        }
+    }
+
+    "applyUpdated" - {
+        "updates name and email of an existing projection" {
+            val id = UUID.randomUUID()
+            val oldTime = Instant.parse("2025-01-01T00:00:00Z")
+            val newTime = Instant.parse("2025-02-01T00:00:00Z")
+            val payload = UserUpdatedPayload(id, "updated", "updated@e.com")
+            val existing = UserEntity().apply {
+                this.id = id
+                this.externalId = id.toString()
+                this.name = "old"
+                this.email = "old@e.com"
+                this.lastSyncAt = oldTime
+                this.deleted = false
+            }
+
+            val slot = slot<UserEntity>()
+            every { repository.findById(id) } returns existing
+            every { repository.save(capture(slot)) } returns existing
+
+            service.applyUpdated(id, newTime, payload)
+
+            slot.captured.name shouldBe "updated"
+            slot.captured.email shouldBe "updated@e.com"
+            slot.captured.lastSyncAt shouldBe newTime
+            slot.captured.deleted shouldBe false
+        }
+    }
+
+    "applyDeleted" - {
+        "soft-deletes an existing projection" {
+            val id = UUID.randomUUID()
+            val oldTime = Instant.parse("2025-01-01T00:00:00Z")
+            val newTime = Instant.parse("2025-02-01T00:00:00Z")
+            val payload = UserDeletedPayload(id)
+            val existing = UserEntity().apply {
+                this.id = id
+                this.externalId = id.toString()
+                this.name = "name"
+                this.email = "email@e.com"
+                this.lastSyncAt = oldTime
+                this.deleted = false
+            }
+
+            val slot = slot<UserEntity>()
+            every { repository.findById(id) } returns existing
+            every { repository.save(capture(slot)) } returns existing
+
+            service.applyDeleted(id, newTime, payload)
+
+            slot.captured.deleted shouldBe true
+            slot.captured.lastSyncAt shouldBe newTime
+            slot.captured.name shouldBe "name"
+        }
+
+        "creates a deleted projection if row does not exist" {
+            val id = UUID.randomUUID()
+            val eventTime = Instant.now()
+            val payload = UserDeletedPayload(id)
+
+            val slot = slot<UserEntity>()
+            every { repository.findById(id) } returns null
+            every { repository.save(capture(slot)) } returns UserEntity()
+
+            service.applyDeleted(id, eventTime, payload)
+
+            slot.captured.id shouldBe id
+            slot.captured.deleted shouldBe true
+            slot.captured.lastSyncAt shouldBe eventTime
+        }
+    }
+}) {
+    init {
+        failfast
+    }
+}

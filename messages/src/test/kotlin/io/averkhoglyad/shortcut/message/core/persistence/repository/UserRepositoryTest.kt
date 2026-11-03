@@ -1,7 +1,6 @@
 package io.averkhoglyad.shortcut.message.core.persistence.repository
 
 import io.averkhoglyad.shortcut.common.test.asInstantColumn
-import io.averkhoglyad.shortcut.common.test.betweenInclusive
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.message.config.PersistenceConfig
@@ -51,16 +50,15 @@ class UserRepositoryTest(
                 val givenName = givenEntity.name
                 val givenEmail = givenEntity.email
                 val givenIsDeleted = givenEntity.deleted
+                val givenLastSyncAt = givenEntity.lastSyncAt
 
                 // when
-                val beforeSave = Instant.now()
                 val result = target.save(givenEntity)
-                val afterSave = Instant.now()
 
                 // then
                 val persistedId = result.id
                 persistedId.shouldNotBeNull()
-                result.lastSyncAt shouldBe betweenInclusive(beforeSave, afterSave)
+                result.lastSyncAt shouldBe givenLastSyncAt
 
                 jdbc.loadUserRow(persistedId).shouldNotBeNull {
                     this shouldContain ("external_id" to givenExternalId)
@@ -82,15 +80,14 @@ class UserRepositoryTest(
                 val givenName = givenEntity.name
                 val givenEmail = givenEntity.email
                 val givenIsDeleted = givenEntity.deleted
+                val givenLastSyncAt = givenEntity.lastSyncAt
 
                 // when
-                val beforeSave = Instant.now()
                 val result = target.save(givenEntity)
-                val afterSave = Instant.now()
 
                 // then
                 result.id shouldNotBeNull { this shouldBeEqual givenId }
-                result.lastSyncAt shouldBe betweenInclusive(beforeSave, afterSave)
+                result.lastSyncAt shouldBe givenLastSyncAt
 
                 jdbc.loadUserRow(givenId).shouldNotBeNull {
                     this shouldContain ("name" to givenName)
@@ -162,5 +159,6 @@ private fun UserEntity.apply(row: Map<String, Any?>): UserEntity {
     email = row["email"] as String
     deleted = row["is_deleted"] as Boolean
     externalId = UUID.randomUUID().toString()
+    lastSyncAt = row["last_sync_at"]!!.asInstantColumn()
     return this
 }
