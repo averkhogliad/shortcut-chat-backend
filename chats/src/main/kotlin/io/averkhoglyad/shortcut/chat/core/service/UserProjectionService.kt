@@ -5,6 +5,7 @@ import io.averkhoglyad.shortcut.chat.core.model.UserDeletedPayload
 import io.averkhoglyad.shortcut.chat.core.model.UserUpdatedPayload
 import io.averkhoglyad.shortcut.chat.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.chat.core.persistence.repository.UserRepository
+import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -12,7 +13,8 @@ import java.util.*
 
 @Service
 class UserProjectionService(
-    private val repository: UserRepository
+    private val repository: UserRepository,
+    private val jdbcAggregateTemplate: JdbcAggregateTemplate,
 ) {
 
     @Transactional
@@ -49,14 +51,13 @@ class UserProjectionService(
             entity.block()
             repository.save(entity)
         } else {
-            repository.save(
-                UserEntity().apply {
-                    this.id = id
-                    externalId = id.toString()
-                    lastSyncAt = eventTime
-                    block()
-                }
-            )
+            val newEntity = UserEntity().apply {
+                this.id = id
+                externalId = id.toString()
+                lastSyncAt = eventTime
+                block()
+            }
+            jdbcAggregateTemplate.insert(newEntity)
         }
     }
 }
