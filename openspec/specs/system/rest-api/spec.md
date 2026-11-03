@@ -16,11 +16,23 @@ The `users` service SHALL expose these endpoints:
 | `GET` | `/users/by-email?email=...` | `User` |
 | `POST` | `/users` | `User` |
 | `PUT` | `/users/{id}` | `User` |
+| `DELETE` | `/users/{id}` | 204 No Content |
 
 #### Scenario: Unknown user
 
 - **WHEN** `GET /users/{id}` is called for a missing user
 - **THEN** the response SHALL use the `ProblemDetail` error format.
+
+#### Scenario: Delete user
+
+- **WHEN** `DELETE /users/{id}` succeeds
+- **THEN** the response status SHALL be `204`.
+
+#### Scenario: Delete unknown user
+
+- **WHEN** `DELETE /users/{id}` is called for a missing user
+- **THEN** the response status SHALL be `404`
+- **AND** the response body SHALL be a `ProblemDetail`.
 
 ### Requirement: Chats REST endpoints
 
@@ -33,11 +45,42 @@ The `chats` service SHALL expose these endpoints:
 | `GET` | `/chats/{id}` | `ChatDetails` |
 | `POST` | `/chats` | `ChatDetails` |
 | `GET` | `/members?chatId=...` | `Collection<ChatMembers>` |
+| `GET` | `/members?chatId=...&includeDeleted=true` | `Collection<ChatMembers>` |
 
 #### Scenario: Chat list page
 
 - **WHEN** `GET /chats` is called with `pageSize`
 - **THEN** the response SHALL be `SliceResponse` with `data` and `next`.
+
+#### Scenario: Chat creation with deleted member rejected
+
+- **WHEN** `POST /chats` is called with a member ID referencing a deleted user
+- **THEN** the response status SHALL be `400`
+- **AND** the response body SHALL be a `ProblemDetail`.
+
+#### Scenario: Members list excludes deleted by default
+
+- **WHEN** `GET /members?chatId=...` is called without `includeDeleted`
+- **THEN** deleted users SHALL NOT appear in the `members` collection of any `ChatMembers` entry.
+
+#### Scenario: Members list includes deleted with parameter
+
+- **WHEN** `GET /members?chatId=...&includeDeleted=true` is called
+- **THEN** deleted users SHALL appear in the `members` collection of the corresponding `ChatMembers` entry.
+
+### Requirement: Deleted user marker in chat responses
+
+`User` objects in `ChatDetails.members`, `ChatDetails.owner`, and `ChatListItem.owner` SHALL include an optional `deleted` boolean field. When the user is marked `deleted=true` in the local projection, the field SHALL be `true`. For active users, the field SHALL be `false` or absent. This field is additive and does not affect existing clients.
+
+#### Scenario: Deleted user in chat details
+
+- **WHEN** `GET /chats/{id}` returns a chat that includes a deleted user among its members
+- **THEN** the deleted user's `User` object in `members` SHALL have `deleted: true`.
+
+#### Scenario: Active user in chat details
+
+- **WHEN** `GET /chats/{id}` returns a chat that includes an active user among its members
+- **THEN** the user's `User` object in `members` SHALL have `deleted: false` or omit the `deleted` field.
 
 ### Requirement: Messages REST endpoints
 
