@@ -2,7 +2,6 @@ package io.averkhoglyad.shortcut.chat.core.persistence.entity
 
 import io.averkhoglyad.shortcut.common.persistence.id.IdentifiedEntity
 import org.springframework.data.annotation.Id
-import org.springframework.data.annotation.LastModifiedDate
 import org.springframework.data.relational.core.mapping.Column
 import org.springframework.data.relational.core.mapping.InsertOnlyProperty
 import org.springframework.data.relational.core.mapping.Table
@@ -24,7 +23,6 @@ class UserEntity : IdentifiedEntity<UUID> {
     @Column("is_deleted")
     var deleted: Boolean = false
 
-    @LastModifiedDate
     @Column("last_sync_at")
     var lastSyncAt: Instant = Instant.MIN
 

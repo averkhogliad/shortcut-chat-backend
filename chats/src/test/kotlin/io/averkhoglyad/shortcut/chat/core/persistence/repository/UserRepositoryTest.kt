@@ -4,7 +4,6 @@ import io.averkhoglyad.shortcut.chat.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.chat.config.PersistenceConfig
 import io.averkhoglyad.shortcut.chat.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.common.test.asInstantColumn
-import io.averkhoglyad.shortcut.common.test.betweenInclusive
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.date.shouldBeCloseTo
@@ -49,16 +48,15 @@ class UserRepositoryTest(
                 val givenName = givenEntity.name
                 val givenEmail = givenEntity.email
                 val givenIsDeleted = givenEntity.deleted
+                val givenLastSyncAt = givenEntity.lastSyncAt
 
                 // when
-                val beforeSave = Instant.now()
                 val result = target.save(givenEntity)
-                val afterSave = Instant.now()
 
                 // then
                 val persistedId = result.id
                 persistedId.shouldNotBeNull()
-                result.lastSyncAt shouldBe betweenInclusive(beforeSave, afterSave)
+                result.lastSyncAt shouldBe givenLastSyncAt
 
                 jdbc.loadUserRow(persistedId).shouldNotBeNull {
                     this shouldContain ("external_id" to givenExternalId)
@@ -80,15 +78,14 @@ class UserRepositoryTest(
                 val givenName = givenEntity.name
                 val givenEmail = givenEntity.email
                 val givenIsDeleted = givenEntity.deleted
+                val givenLastSyncAt = givenEntity.lastSyncAt
 
                 // when
-                val beforeSave = Instant.now()
                 val result = target.save(givenEntity)
-                val afterSave = Instant.now()
 
                 // then
                 result.id shouldNotBeNull { this shouldBeEqual givenId }
-                result.lastSyncAt shouldBe betweenInclusive(beforeSave, afterSave)
+                result.lastSyncAt shouldBe givenLastSyncAt
 
                 jdbc.loadUserRow(givenId).shouldNotBeNull {
                     this shouldContain ("name" to givenName)
@@ -167,6 +164,7 @@ private fun UserEntity.apply(row: Map<String, Any?>): UserEntity {
     name = row["name"] as String
     email = row["email"] as String
     deleted = row["is_deleted"] as Boolean
-    externalId = UUID.randomUUID().toString()
+    externalId = row["external_id"] as String
+    lastSyncAt = (row["last_sync_at"] as java.sql.Timestamp).toInstant()
     return this
 }

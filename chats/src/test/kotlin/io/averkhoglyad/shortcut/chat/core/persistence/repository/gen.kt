@@ -28,6 +28,7 @@ fun Arb.Companion.userEntities(
         this.name = name
         this.email = email
         this.deleted = deleted
+        this.lastSyncAt = Instant.now()
     }
 }
 
