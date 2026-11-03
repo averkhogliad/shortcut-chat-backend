@@ -67,6 +67,7 @@ class MailSendService(
 private fun MessageEntity.completed(): MessageEntity =
     copy(
         status = MessageEntity.Status.COMPLETED,
+        exception = null,
         updatedAt = Instant.now(),
     )
 

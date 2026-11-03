@@ -2,7 +2,10 @@ package io.averkhoglyad.shortcut.message
 
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.producer.KafkaProducer
+import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.StringSerializer
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.context.annotation.Bean
@@ -41,10 +44,22 @@ class TestcontainersConfiguration {
     }
 
     @Bean
+    @Scope("prototype")
+    fun kafkaProducer(kafka: ConfluentKafkaContainer): KafkaProducer<String, Any> {
+        val props = mapOf(
+            ProducerConfig.BOOTSTRAP_SERVERS_CONFIG to kafka.bootstrapServers,
+            ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java,
+            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to org.springframework.kafka.support.serializer.JsonSerializer::class.java,
+            ProducerConfig.ACKS_CONFIG to "all"
+        )
+        return KafkaProducer(props)
+    }
+
+    @Bean
     fun kafkaConsumerProvider(kafka: ConfluentKafkaContainer): (List<String>) -> KafkaConsumer<String, String> {
         return { topics ->
-            this.kafkaConsumer(kafka)
-                .apply{ subscribe(topics) }
+            kafkaConsumer(kafka)
+                .apply { subscribe(topics) }
         }
     }
 }

@@ -7,18 +7,21 @@ import io.averkhoglyad.shortcut.message.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.message.core.persistence.repository.UserRepository
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.shouldBe
+import io.mockk.Called
 import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.springframework.data.jdbc.core.JdbcAggregateTemplate
 import java.time.Instant
 import java.util.*
 
 class UserProjectionServiceTest : FreeSpec({
 
     val repository = mockk<UserRepository>()
-    val service = UserProjectionService(repository)
+    val jdbcAggregateTemplate = mockk<JdbcAggregateTemplate>()
+    val service = UserProjectionService(repository, jdbcAggregateTemplate)
 
     afterTest {
         clearAllMocks()
@@ -32,7 +35,7 @@ class UserProjectionServiceTest : FreeSpec({
 
             val slot = slot<UserEntity>()
             every { repository.findById(id) } returns null
-            every { repository.save(capture(slot)) } returns UserEntity()
+            every { jdbcAggregateTemplate.insert(capture(slot)) } returns UserEntity()
 
             service.applyCreated(id, eventTime, payload)
 
@@ -85,6 +88,7 @@ class UserProjectionServiceTest : FreeSpec({
             service.applyCreated(id, olderTime, payload)
 
             verify(exactly = 0) { repository.save(any()) }
+            verify { jdbcAggregateTemplate wasNot Called }
         }
 
         "ignores an event with equal event time" {
@@ -101,6 +105,7 @@ class UserProjectionServiceTest : FreeSpec({
             service.applyCreated(id, eventTime, payload)
 
             verify(exactly = 0) { repository.save(any()) }
+            verify { jdbcAggregateTemplate wasNot Called }
         }
     }
 
@@ -129,6 +134,23 @@ class UserProjectionServiceTest : FreeSpec({
             slot.captured.email shouldBe "updated@e.com"
             slot.captured.lastSyncAt shouldBe newTime
             slot.captured.deleted shouldBe false
+        }
+
+        "inserts a new projection when row does not exist" {
+            val id = UUID.randomUUID()
+            val eventTime = Instant.now()
+            val payload = UserUpdatedPayload(id, "updated", "updated@e.com")
+
+            val slot = slot<UserEntity>()
+            every { repository.findById(id) } returns null
+            every { jdbcAggregateTemplate.insert(capture(slot)) } returns UserEntity()
+
+            service.applyUpdated(id, eventTime, payload)
+
+            slot.captured.id shouldBe id
+            slot.captured.name shouldBe "updated"
+            slot.captured.email shouldBe "updated@e.com"
+            slot.captured.lastSyncAt shouldBe eventTime
         }
     }
 
@@ -165,7 +187,7 @@ class UserProjectionServiceTest : FreeSpec({
 
             val slot = slot<UserEntity>()
             every { repository.findById(id) } returns null
-            every { repository.save(capture(slot)) } returns UserEntity()
+            every { jdbcAggregateTemplate.insert(capture(slot)) } returns UserEntity()
 
             service.applyDeleted(id, eventTime, payload)
 
