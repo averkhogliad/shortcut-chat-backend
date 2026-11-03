@@ -33,10 +33,10 @@
 - Web: `users`, `chats`, `messages` — Spring MVC; `notifications` — WebFlux.
 - `X-User-Id` — текущий dev-механизм идентификации; у SSE идентификатор передаётся в query `userId`.
 - Kafka producers:
-  - `users`: `MailerCommands` (тип outbox `SendCreatedUserNotification`, имя события `SendEmail`) и `UserLifecycle` (`UserCreated`) через outbox;
+  - `users`: `MailerCommands` (тип outbox `SendCreatedUserNotification`, имя события `SendEmail`) и `UserLifecycle` (`UserCreated`, `UserUpdated`, `UserDeleted`) через outbox;
   - `chats`: `ChatLifecycle` (`ChatCreated`) через outbox;
   - `messages`: `ChatLifecycle` (`MessagePublished`) напрямую после commit.
-- Kafka consumers: `mail-sender` (`MailerCommands`), `notifications` (`ChatLifecycle`).
+- Kafka consumers: `mail-sender` (`MailerCommands`), `notifications` (`ChatLifecycle`), `chats` и `messages` (`UserLifecycle`).
 - HTTP: `notifications` вызывает `chats` через `GET /members?chatId=...`; адрес — `integrations.chat-service.base-url`.
 - Redis: `mail-sender` хранит состояние идемпотентности по `X-Event-Id`, TTL 30 дней.
 - SSE: `notifications` отдаёт live-поток из `MutableSharedFlow` без replay. Модель live-only; требование к replay не зафиксировано, решение — отдельно.
@@ -49,7 +49,7 @@
 Подтверждено кодом и конфигурацией:
 
 - авторизации нет;
-- consumer `UserLifecycle` отсутствует; consumer'ов в `chats`/`messages` нет; синхронизация read-моделей не реализована, критерии приёмки не определены;
+- `chats` и `messages` потребляют `UserLifecycle` и ведут локальную проекцию `users` с идемпотентностью по `last_sync_at`; `users` публикует `UserUpdated`/`UserDeleted` через outbox;
 - `messages` может потерять событие после commit — там outbox нет, доставка не гарантирована; для `users`/`chats` outbox даёт at-least-once, возможны дубли, consumer'ы должны быть идемпотентны;
 - `mail-sender` при ошибке сохраняет `FAILED` и не пробрасывает исключение; retry/DLQ нет. Требования к retry и обработке ошибок не зафиксированы, решение — отдельно;
 - `notifications` не имеет собственной БД; в POM остались Liquibase/PostgreSQL, в `src/test/resources` — SQL-фикстуры. Проверка этих зависимостей и фикстур — отдельная задача;
@@ -60,10 +60,6 @@
 - `PageResponse` не используется; `hypersistence-tsid` объявлен в `dependencyManagement`, но в коде не используется;
 - outbox и Kafka-заголовки вынесены в `tx-outbox`/`tx-outbox-starter`; `EndpointExceptionAdvice` и response-классы дублируются между модулями;
 - Spring Security, JPA/Hibernate, MapStruct, OpenAPI и schema registry не подключены.
-
-Намерения, не реализованные в коде:
-
-- синхронизация read-моделей `users`/`chats` (заявлена в `module-boundaries.md` как будущая задача; критерии приёмки не определены).
 
 ## Ссылки на источники
 

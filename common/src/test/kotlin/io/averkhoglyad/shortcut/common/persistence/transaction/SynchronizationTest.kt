@@ -11,6 +11,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 class SynchronizationTest : FreeSpec({
 
     beforeTest {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.clearSynchronization()
+        }
         TransactionSynchronizationManager.initSynchronization()
     }
 
