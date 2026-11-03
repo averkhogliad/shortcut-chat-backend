@@ -15,14 +15,55 @@ Services SHALL apply `@Transactional` at the service layer. Post-commit actions 
 - **WHEN** a service needs to run an action after a successful commit
 - **THEN** the action SHALL be registered through `afterCommit`.
 
-### Requirement: Outbox write and processing
+### Requirement: Outbox write is transactional
 
-`users` and `chats` SHALL write the outbox record in the same transaction as the aggregate change. The outbox handler SHALL publish pending records and mark them published.
+`users` and `chats` SHALL write the outbox record in the same transaction as the aggregate change.
+
+#### Scenario: Record is written with the aggregate change
+
+- **WHEN** `users` or `chats` changes an aggregate that produces an event
+- **THEN** the aggregate change and the outbox record SHALL be committed in one transaction.
+
+### Requirement: Outbox relay claims and publishes records
+
+The outbox relay SHALL claim pending records, publish them through an `OutboxPublisher`, and transition them through `NEW`, `CLAIMED`, `RETRY_WAIT`, `PUBLISHED`, and `DEAD` states.
 
 #### Scenario: Pending outbox record
 
-- **WHEN** the outbox handler processes a pending record
-- **THEN** it SHALL publish the record to its target topic and mark it published.
+- **WHEN** the relay processes a pending record
+- **THEN** it SHALL publish the record to its target topic and transition it to `PUBLISHED`.
+
+#### Scenario: Pending record is claimed and published
+
+- **WHEN** the relay claims a `NEW` record and the publisher succeeds
+- **THEN** the record SHALL transition to `PUBLISHED`.
+
+### Requirement: Outbox retry and dead-letter
+
+Records that exceed the configurable retry limit SHALL transition to `DEAD`. Retry SHALL use exponential backoff.
+
+#### Scenario: Publish failure schedules retry
+
+- **WHEN** publishing a claimed record fails and the attempt count is below the limit
+- **THEN** the record SHALL transition to `RETRY_WAIT` with exponential backoff up to `maxAttempts`, after which it SHALL transition to `DEAD`.
+
+### Requirement: Outbox leases guard claimed records
+
+Claimed records SHALL be leased to a relay owner until publication or lease expiry, and expired leases SHALL be recovered.
+
+#### Scenario: Expired lease is recovered
+
+- **WHEN** a claimed record's lease has expired
+- **THEN** the relay SHALL recover it for re-publish.
+
+### Requirement: Terminal outbox records are cleaned by retention
+
+Terminal records (`PUBLISHED`, `DEAD`) SHALL be cleaned by retention.
+
+#### Scenario: Terminal records are cleaned
+
+- **WHEN** cleanup runs and a `PUBLISHED` or `DEAD` record is older than its retention
+- **THEN** the record SHALL be deleted.
 
 ### Requirement: Mail idempotency state
 
@@ -66,11 +107,29 @@ Services SHALL apply `@Transactional` at the service layer. Post-commit actions 
 - **WHEN** `users` deletes a user aggregate
 - **THEN** the aggregate change and the `UserDeleted` outbox record SHALL be committed in one transaction.
 
+### Requirement: Message published directly after commit
+
+`messages` SHALL publish `MessagePublished` to `ChatLifecycle` directly from a post-commit callback without the transactional outbox. Delivery is at-most-once: if the process fails after the message aggregate commit and before the Kafka send completes, the event is lost. This trade-off is deliberate to minimize publish latency for interactive message creation. `messages` SHALL NOT write an outbox record or depend on `tx-outbox-starter` for `MessagePublished`.
+
+#### Scenario: Message published after commit
+
+- **WHEN** `messages` creates a message aggregate and the transaction commits
+- **THEN** `messages` SHALL publish `MessagePublished` to `ChatLifecycle` in a post-commit callback.
+
+#### Scenario: Crash after commit before send
+
+- **WHEN** the process crashes after the message aggregate commit but before the Kafka send completes
+- **THEN** the `MessagePublished` event SHALL NOT be delivered, and the loss is accepted as the at-most-once trade-off for lower latency.
+
+#### Scenario: No outbox dependency
+
+- **WHEN** `messages` publishes `MessagePublished`
+- **THEN** it SHALL NOT write an outbox record and SHALL NOT depend on `tx-outbox-starter`.
+
 ## Current Behavior
 
 These are observed current behaviors, not requirements.
 
-- `messages` publishes `MessagePublished` after commit without an outbox. Delivery is not guaranteed.
 - `mail-sender` stores `FAILED` and does not rethrow the exception. Retry and DLQ are not implemented.
 - `notifications` exposes a live-only SSE stream without replay.
 - Synchronization of `users` read models in `chats` and `messages` is not implemented.

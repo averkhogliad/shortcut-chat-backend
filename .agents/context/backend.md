@@ -50,7 +50,8 @@
 
 - авторизации нет;
 - `chats` и `messages` потребляют `UserLifecycle` и ведут локальную проекцию `users` с идемпотентностью по `last_sync_at`; `users` публикует `UserUpdated`/`UserDeleted` через outbox;
-- `messages` может потерять событие после commit — там outbox нет, доставка не гарантирована; для `users`/`chats` outbox даёт at-least-once, возможны дубли, consumer'ы должны быть идемпотентны;
+- `messages` осознанно публикует `MessagePublished` напрямую после commit, минуя outbox, ради низкой задержки интерактивной отправки; доставка at-most-once, потеря события после commit допустима. Решение зафиксировано в `system/runtime-guarantees`; для `users`/`chats` outbox даёт at-least-once, возможны дубли, consumer'ы должны быть идемпотентны;
+- `chats` публикует единственное chat-событие `ChatCreated` через outbox на `ChatLifecycle`. Mutation-ручек (`PUT/DELETE /chats`, управление участниками) нет, поэтому нет `ChatUpdated`, `ChatDeleted` и member-событий. `messages`/`MessagePublished` — message-событие, в chat-скоуп не входит;
 - `mail-sender` при ошибке сохраняет `FAILED` и не пробрасывает исключение; retry/DLQ нет. Требования к retry и обработке ошибок не зафиксированы, решение — отдельно;
 - `notifications` не имеет собственной БД; в POM остались Liquibase/PostgreSQL, в `src/test/resources` — SQL-фикстуры. Проверка этих зависимостей и фикстур — отдельная задача;
 - `common` POM не объявляет `test-compile`; `FlowTest` — предполагаемый дефект тестовой инфраструктуры по статическому аудиту; сборка не запускалась; рабочим покрытием не является;
