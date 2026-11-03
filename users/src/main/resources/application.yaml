@@ -49,6 +49,12 @@ tx-outbox:
     - type: UserCreated
       channel: user-lifecycle
       event-name: UserCreated
+    - type: UserUpdated
+      channel: user-lifecycle
+      event-name: UserUpdated
+    - type: UserDeleted
+      channel: user-lifecycle
+      event-name: UserDeleted
     - type: SendCreatedUserNotification
       channel: mailer-commands
       event-name: SendEmail

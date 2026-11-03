@@ -6,10 +6,13 @@ import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
 import io.averkhoglyad.shortcut.users.core.converter.UserConverter
 import io.averkhoglyad.shortcut.users.core.model.EmailMessage
 import io.averkhoglyad.shortcut.users.core.model.User
+import io.averkhoglyad.shortcut.users.core.model.UserDeleted
 import io.averkhoglyad.shortcut.users.core.persistence.repository.UserRepository
 import io.averkhoglyad.shortcut.users.core.service.message.OutboxMessage
 import io.averkhoglyad.shortcut.users.core.service.message.SendCreatedUserNotificationMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.core.service.message.UserCreatedMessageFactoryImpl
+import io.averkhoglyad.shortcut.users.core.service.message.UserDeletedMessageFactoryImpl
+import io.averkhoglyad.shortcut.users.core.service.message.UserUpdatedMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.test.gen.userEntities
 import io.averkhoglyad.shortcut.users.test.gen.users
 import io.kotest.core.spec.style.FreeSpec
@@ -28,6 +31,8 @@ class UserServiceTest : FreeSpec({
     val repository = mockk<UserRepository>()
     val converter= mockk<UserConverter>()
     val userCreatedMessageFactory = mockk<UserCreatedMessageFactoryImpl>()
+    val userUpdatedMessageFactory = mockk<UserUpdatedMessageFactoryImpl>()
+    val userDeletedMessageFactory = mockk<UserDeletedMessageFactoryImpl>()
     val sendNotificationMessageFactory= mockk<SendCreatedUserNotificationMessageFactoryImpl>()
     val outboxEmitter = mockk<OutboxEmitter>(relaxed = true)
     val userRegistrationCount= mockk<Counter>()
@@ -40,6 +45,8 @@ class UserServiceTest : FreeSpec({
         repository = repository,
         converter = converter,
         userCreatedMessageFactory = userCreatedMessageFactory,
+        userUpdatedMessageFactory = userUpdatedMessageFactory,
+        userDeletedMessageFactory = userDeletedMessageFactory,
         sendCreatedUserNotificationMessageFactory = sendNotificationMessageFactory,
         outboxEmitter = outboxEmitter,
         userRegistrationCounter = userRegistrationCount,
@@ -180,17 +187,19 @@ class UserServiceTest : FreeSpec({
             confirmVerified(repository)
         }
 
-        "returns Success response with updated user" {
+        "returns Success response with updated user and emits UserUpdated" {
             // given
             val id = randomUUID()
             val entity = userEntities.next()
             val input = users.next().copy(id = id)
-            val output = users.next()
+            val output = users.next().copy(id = id)
+            val updatedMessage = OutboxMessage("UserUpdated", "v1", null, output)
 
             every { repository.findById(any()) } returns entity
             every { repository.save(any()) } returns entity
             every { converter.toEntity(any(), any()) } returns entity
             every { converter.fromEntity(any()) } returns output
+            every { userUpdatedMessageFactory.create(any()) } returns updatedMessage
 
             // when
             val result = service.update(input)
@@ -203,8 +212,88 @@ class UserServiceTest : FreeSpec({
             verify { repository.save(entity) }
             verify { converter.toEntity(input, entity) }
             verify { converter.fromEntity(entity) }
+            verify { userUpdatedMessageFactory.create(output) }
 
-            confirmVerified(repository, converter)
+            val type = slot<String>()
+            val version = slot<String>()
+            val key = slot<String?>()
+            val payload = slot<Any>()
+
+            verify {
+                outboxEmitter.emit(
+                    capture(type),
+                    capture(version),
+                    captureNullable(key),
+                    capture(payload),
+                )
+            }
+
+            type.captured shouldBe "UserUpdated"
+            version.captured shouldBe "v1"
+            key.captured shouldBe null
+            payload.captured shouldBeSameInstanceAs output
+
+            confirmVerified(repository, converter, userUpdatedMessageFactory, outboxEmitter)
+        }
+    }
+
+    "delete" - {
+        "returns NotFound response on wrong id" {
+            // given
+            val id = randomUUID()
+            every { repository.findById(id) } returns null
+
+            // when
+            val result = service.delete(id)
+
+            // then
+            result shouldBe NotFound
+
+            verify { repository.findById(id) }
+            confirmVerified(repository)
+        }
+
+        "returns Success and emits UserDeleted for existing user" {
+            // given
+            val id = randomUUID()
+            val entity = userEntities.next().apply { this.id = id }
+            val deletedBody = UserDeleted(id)
+            val deletedMessage = OutboxMessage("UserDeleted", "v1", null, deletedBody)
+
+            every { repository.findById(any()) } returns entity
+            every { repository.deleteById(any()) } just runs
+            every { userDeletedMessageFactory.create(any()) } returns deletedMessage
+
+            // when
+            val result = service.delete(id)
+
+            // then
+            result.shouldBeInstanceOf<Success<Unit>>()
+
+            verify { repository.findById(id) }
+            verify { repository.deleteById(id) }
+            verify { userDeletedMessageFactory.create(deletedBody) }
+
+            val type = slot<String>()
+            val version = slot<String>()
+            val key = slot<String?>()
+            val payload = slot<Any>()
+
+            verify {
+                outboxEmitter.emit(
+                    capture(type),
+                    capture(version),
+                    captureNullable(key),
+                    capture(payload),
+                )
+            }
+
+            type.captured shouldBe "UserDeleted"
+            version.captured shouldBe "v1"
+            key.captured shouldBe null
+            payload.captured shouldBeSameInstanceAs deletedBody
+
+            confirmVerified(repository, userDeletedMessageFactory, outboxEmitter)
         }
     }
 }) {

@@ -12,4 +12,6 @@ interface UserRepository: Repository<UserEntity, UUID> {
 
     fun save(user: UserEntity): UserEntity
 
+    fun deleteById(id: UUID)
+
 }

@@ -6,11 +6,14 @@ import io.averkhoglyad.shortcut.common.util.slf4j
 import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
 import io.averkhoglyad.shortcut.users.core.converter.UserConverter
 import io.averkhoglyad.shortcut.users.core.model.User
+import io.averkhoglyad.shortcut.users.core.model.UserDeleted
 import io.averkhoglyad.shortcut.users.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.users.core.persistence.repository.UserRepository
 import io.averkhoglyad.shortcut.users.core.service.message.OutboxMessage
 import io.averkhoglyad.shortcut.users.core.service.message.SendCreatedUserNotificationMessageFactoryImpl
 import io.averkhoglyad.shortcut.users.core.service.message.UserCreatedMessageFactoryImpl
+import io.averkhoglyad.shortcut.users.core.service.message.UserDeletedMessageFactoryImpl
+import io.averkhoglyad.shortcut.users.core.service.message.UserUpdatedMessageFactoryImpl
 import io.micrometer.core.instrument.Counter
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,6 +25,7 @@ interface UserService {
     fun findByEmail(email: String): EntityResult<User>
     fun create(user: User): EntityResult<User>
     fun update(user: User): EntityResult<User>
+    fun delete(id: UUID): EntityResult<Unit>
 
 }
 
@@ -30,6 +34,8 @@ class UserServiceImpl(
     private val repository: UserRepository,
     private val converter: UserConverter,
     private val userCreatedMessageFactory: UserCreatedMessageFactoryImpl,
+    private val userUpdatedMessageFactory: UserUpdatedMessageFactoryImpl,
+    private val userDeletedMessageFactory: UserDeletedMessageFactoryImpl,
     private val sendCreatedUserNotificationMessageFactory: SendCreatedUserNotificationMessageFactoryImpl,
     private val outboxEmitter: OutboxEmitter,
     private val userRegistrationCounter: Counter,
@@ -73,7 +79,6 @@ class UserServiceImpl(
     }
 
     private fun emitUserCreatedStreamingEvent(user: User) {
-        // TODO: Add user creates streaming event
         logger.info("User ${user.id} created - streaming event")
     }
 
@@ -98,19 +103,21 @@ class UserServiceImpl(
 
         return repository.save(user.toEntity(entity))
             .toModel()
-            .also { emitUserUpdatedLifecycleEvent(it) }
-            .also { emitUserUpdatedStreamingEvent(it) }
+            .also { emit(userUpdatedMessageFactory.create(it)) }
+            .also { logger.info("User ${it.id} updated - streaming event") }
             .let { EntityResult.Success(it) }
     }
 
-    private fun emitUserUpdatedLifecycleEvent(user: User) {
-        // TODO: Add user updated lifecycle event
-        logger.info("User ${user.id} updated - business event")
-    }
+    @Transactional
+    override fun delete(id: UUID): EntityResult<Unit> {
+        if (repository.findById(id) == null) {
+            return EntityResult.NotFound
+        }
 
-    private fun emitUserUpdatedStreamingEvent(user: User) {
-        // TODO: Add user updated streaming event
-        logger.info("User ${user.id} updated - streaming event")
+        repository.deleteById(id)
+        emit(userDeletedMessageFactory.create(UserDeleted(id)))
+
+        return EntityResult.Success(Unit)
     }
 
     private fun User.toEntity(): UserEntity = converter.toEntity(this)
@@ -119,4 +126,3 @@ class UserServiceImpl(
 
     private fun UserEntity.toModel(): User = converter.fromEntity(this)
 }
-

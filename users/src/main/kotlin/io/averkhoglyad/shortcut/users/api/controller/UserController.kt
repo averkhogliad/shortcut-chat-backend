@@ -3,6 +3,7 @@ package io.averkhoglyad.shortcut.users.api.controller
 import io.averkhoglyad.shortcut.common.web.handler.unwrap
 import io.averkhoglyad.shortcut.users.core.model.User
 import io.averkhoglyad.shortcut.users.core.service.UserService
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import java.util.*
 
@@ -36,5 +37,12 @@ class UserController(
         require(user.id == null || user.id == id)
         return service.update(user.copy(id = id))
             .unwrap()
+    }
+
+    @DeleteMapping("/{id}")
+    fun delete(@PathVariable id: UUID): ResponseEntity<Unit> {
+        return service.delete(id)
+            .unwrap()
+            .let { ResponseEntity.noContent().build() }
     }
 }
