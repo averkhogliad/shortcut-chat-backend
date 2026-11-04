@@ -4,15 +4,12 @@ import io.averkhoglyad.shortcut.message.core.model.ChatRef
 import io.averkhoglyad.shortcut.message.core.model.Message
 import io.averkhoglyad.shortcut.message.core.model.UserRef
 import io.kotest.core.spec.style.FreeSpec
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeSameInstanceAs
 import org.apache.kafka.common.header.Headers
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.UUID
 import java.util.UUID.randomUUID
 
 class MessageCreatedMessageFactoryImplTest : FreeSpec({
@@ -40,11 +37,10 @@ class MessageCreatedMessageFactoryImplTest : FreeSpec({
             record.key() shouldBe message.chat.id.toString()
             record.value() shouldBeSameInstanceAs message
             record.headers().verifyHeaders("MessagePublished")
-            val eventId = record.headers().headerAsString("X-Event-Id").shouldNotBeNull()
-            UUID.fromString(eventId)
+            record.headers().headerAsString("X-Event-Id") shouldBe message.id.toString()
         }
 
-        "generates unique event id for every record" {
+        "keeps the same event id for repeated creates of the same message" {
             // given
             val message = message()
 
@@ -53,7 +49,8 @@ class MessageCreatedMessageFactoryImplTest : FreeSpec({
             val second = target.create(message).headers().headerAsString("X-Event-Id")
 
             // then
-            first shouldNotBe second
+            first shouldBe message.id.toString()
+            second shouldBe first
         }
     }
 })

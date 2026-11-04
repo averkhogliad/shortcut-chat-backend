@@ -1,15 +1,16 @@
 package io.averkhoglyad.shortcut.outbox.autoconfigure
 
+import io.averkhoglyad.shortcut.common.kafka.KafkaHeaders
 import java.time.Instant
 import java.util.UUID
 
 object OutboxHeaderNames {
 
-    const val EVENT_ID = "X-Event-Id"
-    const val EVENT_NAME = "X-Event-Name"
-    const val EVENT_VERSION = "X-Event-Version"
-    const val PUBLISHED_AT = "X-Published-At"
-    const val PUBLISHED_BY = "X-Published-By"
+    const val EVENT_ID = KafkaHeaders.EVENT_ID
+    const val EVENT_NAME = KafkaHeaders.EVENT_NAME
+    const val EVENT_VERSION = KafkaHeaders.EVENT_VERSION
+    const val PUBLISHED_AT = KafkaHeaders.PUBLISHED_AT
+    const val PUBLISHED_BY = KafkaHeaders.PUBLISHED_BY
 
     val STANDARD = setOf(EVENT_ID, EVENT_NAME, EVENT_VERSION, PUBLISHED_AT, PUBLISHED_BY)
 

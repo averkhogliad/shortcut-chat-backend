@@ -1,5 +1,6 @@
 package io.averkhoglyad.shortcut.message.core.output
 
+import io.averkhoglyad.shortcut.common.kafka.KafkaHeaders
 import io.averkhoglyad.shortcut.message.core.model.Message
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.header.Headers
@@ -7,7 +8,6 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import java.time.Clock
-import java.util.*
 
 @Component
 class MessageCreatedMessageFactoryImpl(
@@ -34,20 +34,13 @@ class MessageCreatedMessageFactoryImpl(
         ProducerRecord<String, Any>(topic, event.chat.id.toString(), event)
             .apply {
                 headers()
-                    .addAsString(EVENT_ID, UUID.randomUUID())
-                    .addAsString(EVENT_NAME, eventName)
-                    .addAsString(EVENT_VERSION, version)
-                    .addAsString(PUBLISHED_AT, clock.instant())
-                    .addAsString(PUBLISHED_BY, applicationName)
+                    .addAsString(KafkaHeaders.EVENT_ID, event.id.toString())
+                    .addAsString(KafkaHeaders.EVENT_NAME, eventName)
+                    .addAsString(KafkaHeaders.EVENT_VERSION, version)
+                    .addAsString(KafkaHeaders.PUBLISHED_AT, clock.instant())
+                    .addAsString(KafkaHeaders.PUBLISHED_BY, applicationName)
             }
 }
-
-// TODO: Must be moved to common lib with other infrastructure aware code, configs, constants
-private const val EVENT_ID = "X-Event-Id"
-private const val EVENT_NAME = "X-Event-Name"
-private const val EVENT_VERSION = "X-Event-Version"
-private const val PUBLISHED_AT = "X-Published-At"
-private const val PUBLISHED_BY = "X-Published-By"
 
 private fun Headers.addAsString(name: String, value: String): Headers =
     add(name, value.toByteArray(Charsets.UTF_8))
