@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.outbox.autoconfigure
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.common.util.slf4j
 import io.averkhoglyad.shortcut.outbox.messaging.OutboxPublisher
 import org.springframework.beans.factory.ObjectProvider

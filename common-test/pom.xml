@@ -27,7 +27,7 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>io.kotest.extensions</groupId>
+            <groupId>io.kotest</groupId>
             <artifactId>kotest-extensions-spring</artifactId>
             <scope>provided</scope>
         </dependency>

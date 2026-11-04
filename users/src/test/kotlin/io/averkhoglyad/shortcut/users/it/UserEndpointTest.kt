@@ -1,13 +1,13 @@
 package io.averkhoglyad.shortcut.users.it
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.averkhoglyad.shortcut.users.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.users.core.model.User
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType.APPLICATION_JSON
@@ -209,7 +209,7 @@ class UserEndpointTest(
             val outbox = jdbc.findOutboxByEventName("UserDeleted").shouldNotBeNull()
             outbox["topic"] shouldBe "UserLifecycle"
             val bodyNode = mapper.readTree(outbox["body"].toString())
-            bodyNode["id"].asText() shouldBe userId.toString()
+            bodyNode["id"].stringValue() shouldBe userId.toString()
         }
 
         "returns ProblemDetail for missing user" {

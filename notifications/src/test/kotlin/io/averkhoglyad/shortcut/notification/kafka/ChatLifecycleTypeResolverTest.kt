@@ -16,7 +16,7 @@ class ChatLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("ChatCreated")
 
             // when
-            val result = target.resolveType("ChatLifecycle", null, headers)
+            val result = target.resolveType("ChatLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe ChatCreated::class.java
@@ -27,7 +27,7 @@ class ChatLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("MessagePublished")
 
             // when
-            val result = target.resolveType("ChatLifecycle", null, headers)
+            val result = target.resolveType("ChatLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe MessagePublished::class.java
@@ -38,7 +38,7 @@ class ChatLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("UnexpectedEvent")
 
             // when
-            val result = target.resolveType("ChatLifecycle", null, headers)
+            val result = target.resolveType("ChatLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe Map::class.java
@@ -49,7 +49,7 @@ class ChatLifecycleTypeResolverTest : FreeSpec({
             val headers = RecordHeaders()
 
             // when
-            val result = target.resolveType("ChatLifecycle", null, headers)
+            val result = target.resolveType("ChatLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe Map::class.java

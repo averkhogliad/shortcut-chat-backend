@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.chat.it
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.chat.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.chat.core.model.ChatDetails
 import io.averkhoglyad.shortcut.chat.core.model.ChatRequest
@@ -14,7 +14,7 @@ import io.kotest.matchers.maps.shouldContain
 import io.kotest.matchers.maps.shouldContainKeys
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType.APPLICATION_JSON

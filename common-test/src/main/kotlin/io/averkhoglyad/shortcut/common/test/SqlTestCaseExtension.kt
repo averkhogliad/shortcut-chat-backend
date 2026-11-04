@@ -2,7 +2,7 @@ package io.averkhoglyad.shortcut.common.test
 
 import io.kotest.core.extensions.TestCaseExtension
 import io.kotest.core.test.TestCase
-import io.kotest.core.test.TestResult
+import io.kotest.engine.test.TestResult
 import io.kotest.extensions.spring.testContextManager
 import org.springframework.context.ApplicationContext
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils

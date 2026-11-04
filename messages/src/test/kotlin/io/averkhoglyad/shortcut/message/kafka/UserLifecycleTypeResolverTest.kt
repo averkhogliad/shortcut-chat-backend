@@ -15,7 +15,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
         "returns UserCreatedPayload type for UserCreated event name" {
             val headers = headersWith("UserCreated")
 
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             result.rawClass shouldBe UserCreatedPayload::class.java
         }
@@ -23,7 +23,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
         "returns UserUpdatedPayload type for UserUpdated event name" {
             val headers = headersWith("UserUpdated")
 
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             result.rawClass shouldBe UserUpdatedPayload::class.java
         }
@@ -31,7 +31,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
         "returns UserDeletedPayload type for UserDeleted event name" {
             val headers = headersWith("UserDeleted")
 
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             result.rawClass shouldBe UserDeletedPayload::class.java
         }
@@ -39,7 +39,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
         "returns Map type for unknown event name" {
             val headers = headersWith("UnexpectedEvent")
 
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             result.rawClass shouldBe Map::class.java
         }
@@ -47,7 +47,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
         "returns Map type when event name header is absent" {
             val headers = RecordHeaders()
 
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             result.rawClass shouldBe Map::class.java
         }

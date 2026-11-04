@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.outbox.autoconfigure
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.outbox.core.OutboxCleaner
 import io.averkhoglyad.shortcut.outbox.core.OutboxRelay
 import io.averkhoglyad.shortcut.outbox.core.OutboxWriter

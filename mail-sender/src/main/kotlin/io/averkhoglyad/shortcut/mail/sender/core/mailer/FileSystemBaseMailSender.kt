@@ -26,7 +26,7 @@ class FileSystemBaseMailSender(
     private val outputPath: Path
 ) : MailSender {
 
-    override fun send(vararg simpleMessages: SimpleMailMessage?) {
+    override fun send(vararg simpleMessages: SimpleMailMessage) {
         simpleMessages
             .filterNotNull()
             .flatMap { message -> (message.to ?: arrayOf("null")).map { recipient -> recipient to message } }

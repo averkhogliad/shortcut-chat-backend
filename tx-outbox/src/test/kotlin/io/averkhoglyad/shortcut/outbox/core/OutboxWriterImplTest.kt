@@ -14,6 +14,7 @@ import io.mockk.verify
 import org.springframework.aop.framework.ProxyFactory
 import org.springframework.transaction.IllegalTransactionStateException
 import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.TransactionManager
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource
 import org.springframework.transaction.interceptor.TransactionInterceptor
 import org.springframework.transaction.support.AbstractPlatformTransactionManager
@@ -26,7 +27,7 @@ class OutboxWriterImplTest : FreeSpec({
     val transactionManager = TestTransactionManager()
     val target: OutboxWriter = ProxyFactory(OutboxWriterImpl(dao)).apply {
         isProxyTargetClass = false
-        addAdvice(TransactionInterceptor(transactionManager, AnnotationTransactionAttributeSource()))
+        addAdvice(TransactionInterceptor(transactionManager as TransactionManager, AnnotationTransactionAttributeSource()))
     }.proxy as OutboxWriter
 
     afterTest {

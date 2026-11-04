@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.message.it
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.averkhoglyad.shortcut.common.util.toUUID
 import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
@@ -16,7 +16,7 @@ import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.header.Headers
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType.APPLICATION_JSON

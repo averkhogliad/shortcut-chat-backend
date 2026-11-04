@@ -4,13 +4,13 @@ import org.springframework.data.jdbc.core.mapping.AggregateReference
 
 object EmptyReference : AggregateReference<Nothing, Nothing> {
 
-    override fun getId(): Nothing? = null
+    override fun getId(): Nothing = throw UnsupportedOperationException("Empty reference has no id")
 
 }
 
-fun <E, I> emptyReference(): AggregateReference<out E, out I> {
+fun <E : Any, I : Any> emptyReference(): AggregateReference<out E, out I> {
     return EmptyReference
 }
 
 val AggregateReference<*, *>.isEmpty
-    get() = this.id == null
+    get() = this === EmptyReference

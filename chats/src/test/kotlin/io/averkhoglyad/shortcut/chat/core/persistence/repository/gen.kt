@@ -41,7 +41,7 @@ fun Arb.Companion.chatEntities(
     Arb.string(),
     ownerIds,
     members,
-    Arb.instant(Instant.EPOCH..Instant.now()),
+    Arb.javaInstant(Instant.EPOCH..Instant.now()),
 ) { id, name, ownerId, memberEntities, createdAt ->
     ChatEntity().apply {
         this.id = id
@@ -56,7 +56,7 @@ fun Arb.Companion.memberEntities(
     userIds: Gen<UUID> = Arb.uuid()
 ): Arb<MemberEntity> = Arb.bind(
     userIds,
-    Arb.instant(Instant.EPOCH..Instant.now()),
+    Arb.javaInstant(Instant.EPOCH..Instant.now()),
 ) { userId, createdAt ->
     MemberEntity().apply {
         this.user = AggregateReference.to(userId)

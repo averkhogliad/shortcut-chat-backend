@@ -8,7 +8,7 @@ class NoopMailSender : MailSender {
 
     private val logger = LoggerFactory.getLogger(NoopMailSender::class.java)
 
-    override fun send(vararg simpleMessages: SimpleMailMessage?) {
+    override fun send(vararg simpleMessages: SimpleMailMessage) {
         simpleMessages
             .filterNotNull()
             .forEach { message -> writeMessageToLog(message) }

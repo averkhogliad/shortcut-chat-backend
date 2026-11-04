@@ -17,7 +17,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("UserCreated")
 
             // when
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe UserCreatedPayload::class.java
@@ -28,7 +28,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("UserUpdated")
 
             // when
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe UserUpdatedPayload::class.java
@@ -39,7 +39,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("UserDeleted")
 
             // when
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe UserDeletedPayload::class.java
@@ -50,7 +50,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
             val headers = headersWith("UnexpectedEvent")
 
             // when
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe Map::class.java
@@ -61,7 +61,7 @@ class UserLifecycleTypeResolverTest : FreeSpec({
             val headers = RecordHeaders()
 
             // when
-            val result = target.resolveType("UserLifecycle", null, headers)
+            val result = target.resolveType("UserLifecycle", ByteArray(0), headers)
 
             // then
             result.rawClass shouldBe Map::class.java

@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.outbox.persistence
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.common.test.asInstantColumn
 import io.averkhoglyad.shortcut.common.test.betweenInclusive
 import io.averkhoglyad.shortcut.outbox.core.OutboxEntry
@@ -14,7 +14,7 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.Exhaustive
-import io.kotest.property.arbitrary.instant
+import io.kotest.property.arbitrary.javaInstant
 import io.kotest.property.arbitrary.map
 import io.kotest.property.arbitrary.next
 import io.kotest.property.arbitrary.uuid
@@ -23,7 +23,7 @@ import org.springframework.core.io.DefaultResourceLoader
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator
-import org.testcontainers.containers.PostgreSQLContainer
+import org.testcontainers.postgresql.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 import java.sql.Timestamp
 import java.time.Instant
@@ -35,7 +35,7 @@ private const val SCHEMA = "classpath:io/averkhoglyad/shortcut/outbox/migrations
 
 class OutboxDaoIntegrationTest : FreeSpec({
 
-    lateinit var postgres: PostgreSQLContainer<*>
+    lateinit var postgres: PostgreSQLContainer
     lateinit var dataSource: DataSource
     lateinit var jdbc: JdbcClient
     lateinit var target: OutboxDao
@@ -96,7 +96,7 @@ class OutboxDaoIntegrationTest : FreeSpec({
             // given
             val entry = testEntry(
                 id = Arb.uuid().next(),
-                createdAt = Arb.instant(Instant.parse("2020-01-01T00:00:00Z")..Instant.parse("2025-01-01T00:00:00Z"))
+                createdAt = Arb.javaInstant(Instant.parse("2020-01-01T00:00:00Z")..Instant.parse("2025-01-01T00:00:00Z"))
                     .map { it.truncatedTo(ChronoUnit.MILLIS) }
                     .next(),
             )

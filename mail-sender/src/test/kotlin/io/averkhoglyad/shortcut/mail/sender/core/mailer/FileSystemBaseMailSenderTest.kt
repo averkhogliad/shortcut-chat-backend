@@ -63,15 +63,17 @@ class FileSystemBaseMailSenderTest : FreeSpec({
             outputDir.resolve("null").emlFiles() shouldHaveSize 1
         }
 
-        "ignores null messages" {
+        "writes every message passed in a single send call" {
             // given
-            val message = message("only@example.com")
+            val first = message("first-only@example.com")
+            val second = message("second-only@example.com")
 
             // when
-            target.send(null as SimpleMailMessage?, message)
+            target.send(first, second)
 
             // then
-            outputDir.resolve("only@example.com").emlFiles() shouldHaveSize 1
+            outputDir.resolve("first-only@example.com").emlFiles() shouldHaveSize 1
+            outputDir.resolve("second-only@example.com").emlFiles() shouldHaveSize 1
         }
     }
 })

@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.outbox.autoconfigure
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import com.fasterxml.uuid.Generators
 import com.fasterxml.uuid.impl.TimeBasedEpochGenerator
 import io.averkhoglyad.shortcut.outbox.core.OutboxEntry

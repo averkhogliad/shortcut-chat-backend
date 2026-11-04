@@ -56,7 +56,7 @@ fun Arb.Companion.memberEntities(
     userIds: Gen<UUID> = Arb.uuid()
 ): Arb<MemberEntity> = Arb.bind(
     userIds,
-    Arb.instant(Instant.EPOCH..Instant.now()),
+    Arb.javaInstant(Instant.EPOCH..Instant.now()),
 ) { userId, createdAt ->
     MemberEntity()
         .apply {

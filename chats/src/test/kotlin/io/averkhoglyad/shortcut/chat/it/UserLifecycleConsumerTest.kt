@@ -1,6 +1,6 @@
 package io.averkhoglyad.shortcut.chat.it
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.chat.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.chat.core.model.UserCreatedPayload
 import io.averkhoglyad.shortcut.chat.core.model.UserDeletedPayload
