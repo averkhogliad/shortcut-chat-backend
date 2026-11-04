@@ -1,5 +1,6 @@
 package io.averkhoglyad.shortcut.notification.kafka
 
+import io.averkhoglyad.shortcut.common.kafka.KafkaHeaders
 import io.averkhoglyad.shortcut.notification.data.ChatCreated
 import io.averkhoglyad.shortcut.notification.data.MessagePublished
 import io.kotest.core.spec.style.FreeSpec
@@ -58,4 +59,4 @@ class ChatLifecycleTypeResolverTest : FreeSpec({
 })
 
 private fun headersWith(eventName: String) = RecordHeaders()
-    .apply { add(EVENT_NAME, eventName.toByteArray(Charsets.UTF_8)) }
+    .apply { add(KafkaHeaders.EVENT_NAME, eventName.toByteArray(Charsets.UTF_8)) }
