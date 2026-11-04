@@ -2,13 +2,13 @@
 
 Справочный контекст, не правила. Читать перед архитектурным анализом, изменением backend-кода и проектированием тестов. Нормативные требования — в `.agents/rules/`, ожидаемое поведение — в `openspec/specs/`.
 
-Базовая точка аудита: commit `c537b69`, дата 2026-10-25. Факты проверены по коду, POM и конфигурации; намерения помечены отдельно.
+Базовая точка аудита: commit `c537b69`, дата 2026-10-25. Факты проверены по коду, POM и конфигурации; намерения помечены отдельно. Стек, версии и тестовая инфраструктура перепроверены при актуализации `tech-debt-cleanup` (2026-11-04).
 
 ## Модули
 
 | Модуль | Пакет | App | Роль | Хранилище |
 |---|---|---|---|---|
-| `common` | `io.averkhoglyad.shortcut.common` | — | `EntityResult`, ID callback, transaction callbacks, web handler, flow/log utils | — |
+| `common` | `io.averkhoglyad.shortcut.common` | — | `EntityResult`, ID callback, transaction callbacks, web handler, `KafkaHeaders`, `EventNameTypeResolver`, flow/log utils | — |
 | `common-test` | `io.averkhoglyad.shortcut.common.test` | — | `SpringAwareKotestConfig`, `SqlTestCaseExtension`, matchers | — |
 | `tx-outbox` | `io.averkhoglyad.shortcut.outbox` | — | доменно-нейтральное ядро outbox: `OutboxWriter`, `OutboxRelay`, `OutboxCleaner`, `OutboxDao` (`JdbcClient`), SPI `OutboxPublisher`, артефакты схемы `message_outbox` | — |
 | `tx-outbox-starter` | `io.averkhoglyad.shortcut.outbox.autoconfigure` | — | автоконфигурация outbox: properties, роутер, провайдер заголовков, `OutboxEmitter`, дефолтный Kafka-publisher, scheduler, метрики | — |
@@ -20,13 +20,31 @@
 
 `tx-outbox` и `tx-outbox-starter` — библиотечные модули, не сервисы, БД не владеют.
 
+## Стек и версии
+
+Версии — факты по корневому `pom.xml`, POM модулей и `.mvn/wrapper/maven-wrapper.properties`; нормативные требования к стеку — `openspec/specs/platform/stack/spec.md`.
+
+- Java 17, Kotlin 2.4.21 (`kotlin.version` переопределяет управляемую Boot версию), Spring Boot 4.1.2 (BOM `spring-boot-dependencies`): Spring Framework 7, Spring Kafka 4.1.2, Jackson 3 (managed 3.1.7).
+- Jackson 3: координаты `tools.jackson.*`, аннотации остались `com.fasterxml.jackson.annotation`; Jackson 2 (databind/core) в коде отсутствует.
+- Тесты: Kotest 6.2.6 (`io.kotest:*`), MockK 1.14.11 (`mockk-jvm`), Testcontainers 2.0.5 (BOM). SpringMockK удалён: в коде не использовался, версии под Boot 4 нет.
+- Прочее: ShedLock 7.10.1, `java-uuid-generator` 5.2.0, `hypersistence-tsid` 2.1.4, Jakarta Mail API 2.1.5, `loki-logback-appender` 2.0.3 (2.1.0 требует Logback 1.6, Boot 4.1.2 управляет 1.5.38).
+- Сборка: Maven 3.9.16 через Maven Wrapper 3.3.4; `maven-surefire-plugin` 3.5.6 закреплён в `pluginManagement` — дефолтная для Maven 3.9.16 версия 3.0.0-M7 с Kotest 6 / JUnit Platform 6 даёт `Tests run: 0`.
+
+## Тестовая инфраструктура
+
+- `common-test`: `SpringAwareKotestConfig` регистрирует единственное расширение `SpringExtension()`; `SpringAutowireConstructorExtension` в Kotest 6 не используется. Также `SqlTestCaseExtension`/`sql(...)` и matchers.
+- Конфигурация Kotest берётся из `kotest.properties` в `src/test/resources`; такой файл есть во всех восьми модулях с тестами, включая `common`, `tx-outbox` и `tx-outbox-starter`.
+- Testcontainers 2: координаты `testcontainers-postgresql`, `testcontainers-kafka`, `testcontainers-junit-jupiter`; пакеты `org.testcontainers.postgresql.PostgreSQLContainer`, `org.testcontainers.kafka.ConfluentKafkaContainer`; мосты `org.testcontainers.containers.*` не используются. `TestcontainersConfiguration` с `@ServiceConnection` есть только в `users` (PostgreSQL), `chats` и `messages` (PostgreSQL и Kafka); `tx-outbox` создаёт `PostgreSQLContainer` напрямую в `OutboxDaoIntegrationTest`, `notifications` объявляет `testcontainers-postgresql`, но контейнер в тестах не использует.
+- Boot 4: test-аннотации в новых пакетах — `org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc`, `org.springframework.boot.data.jdbc.test.autoconfigure.DataJdbcTest`, `org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase`.
+- `kotest-extensions-testcontainers` объявлен в `users` и `chats`, в тестах не используется.
+
 ## Точки входа
 
 - REST: `UserController` `/users`; `ChatController` `/chats`; `ChatMembersController` `/members`; `MessageController` `/messages`.
 - Kafka: `SendCommandHandler` (`MailerCommands`); `ChatLifecycleEventsHandler` (`ChatLifecycle`, тип события по `X-Event-Name`).
 - SSE: `GET /subscribe?userId=...` — `WebConfig` и `NotificationSubscriptionHandler`.
 - Outbox jobs: `tx-outbox-starter` (`TxOutboxScheduleConfig`, relay и cleanup на `outboxTaskScheduler`, профиль `!test`); сервисы дают только `LockProvider` в своём `ScheduleConfig`.
-- Тесты: `<module>/src/test/kotlin`; фикстуры `src/test/resources/it/**` и `src/test/resources/repository/**` в `chats`, `messages`, `notifications`; генераторы `gen.kt` в `users`, `chats`, `messages`, `mail-sender`.
+- Тесты: `<module>/src/test/kotlin`; фикстуры `src/test/resources/it/**` и `src/test/resources/repository/**` в `users`, `chats`, `messages`; `repository/**` также в `notifications`; генераторы `gen.kt` в `chats`, `messages`, `mail-sender`, `tx-outbox`, `tx-outbox-starter`.
 
 ## Взаимодействия
 
@@ -37,6 +55,7 @@
   - `chats`: `ChatLifecycle` (`ChatCreated`) через outbox;
   - `messages`: `ChatLifecycle` (`MessagePublished`) напрямую после commit.
 - Kafka consumers: `mail-sender` (`MailerCommands`), `notifications` (`ChatLifecycle`), `chats` и `messages` (`UserLifecycle`).
+- Kafka-сериализация: JSON через Jackson 3 и Spring Kafka 4 — `JacksonJsonDeserializer` с `JacksonJsonTypeResolver` (`common.kafka.EventNameTypeResolver`, тип по `X-Event-Name`, `setUseTypeHeaders(false)`) в `chats`, `messages`, `notifications`; `messages` публикует через `JacksonJsonSerializer`, `users`/`chats` публикуют JSON-байты из outbox (`ByteArraySerializer`); `mail-sender` потребляет `JacksonJsonDeserializer` с `spring.json.use.type.headers=false`.
 - HTTP: `notifications` вызывает `chats` через `GET /members?chatId=...`; адрес — `integrations.chat-service.base-url`.
 - Redis: `mail-sender` хранит состояние идемпотентности по `X-Event-Id`, TTL 30 дней.
 - SSE: `notifications` отдаёт live-поток из `MutableSharedFlow` без replay. Модель live-only; требование к replay не зафиксировано, решение — отдельно.
@@ -54,7 +73,7 @@
 - `chats` публикует единственное chat-событие `ChatCreated` через outbox на `ChatLifecycle`. Mutation-ручек (`PUT/DELETE /chats`, управление участниками) нет, поэтому нет `ChatUpdated`, `ChatDeleted` и member-событий. `messages`/`MessagePublished` — message-событие, в chat-скоуп не входит;
 - `mail-sender` при ошибке сохраняет `FAILED` и не пробрасывает исключение; retry/DLQ нет. Требования к retry и обработке ошибок не зафиксированы, решение — отдельно;
 - `notifications` не имеет собственной БД; в POM остались Liquibase/PostgreSQL, в `src/test/resources` — SQL-фикстуры. Проверка этих зависимостей и фикстур — отдельная задача;
-- `common` POM не объявляет `test-compile`; `FlowTest` — предполагаемый дефект тестовой инфраструктуры по статическому аудиту; сборка не запускалась; рабочим покрытием не является;
+- `common` объявляет `test-compile` и содержит тесты в `src/test/kotlin` (`FlowTest`, `SynchronizationTest`, `EntityResultHandlerTest`); предположение базового аудита о дефекте тестовой инфраструктуры `common` не подтверждено;
 - Datasource URL задаётся извне; дефолтного URL в `application.yaml` нет. Контуры `users` передают URL явно; контуров для `chats`/`messages` в репозитории нет;
 - CI, линтеров, форматтеров и integration-test профиля нет;
 - в `docker/docker-compose.yml`, Helm и K8s развёрнуты только `users` и `mail-sender`;
