@@ -10,6 +10,7 @@ class UserUpdatedMessageFactoryImpl() : MessageFactory<User, User> {
         return OutboxMessage(
             type = "UserUpdated",
             version = "v1",
+            key = user.id.toString(),
             body = user
         )
     }

@@ -14,6 +14,7 @@ class UserCreatedMessageFactoryImplTest: FreeSpec({
             val result = factory.create(user)
             result.type shouldBe "UserCreated"
             result.version shouldBe "v1"
+            result.key shouldBe user.id.toString()
             result.body shouldBe user
         }
     }

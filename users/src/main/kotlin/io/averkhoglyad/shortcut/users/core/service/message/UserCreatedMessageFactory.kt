@@ -10,6 +10,7 @@ class UserCreatedMessageFactoryImpl() : MessageFactory<User, User> {
         return OutboxMessage(
             type = "UserCreated",
             version = "v1",
+            key = user.id.toString(),
             body = user
         )
     }

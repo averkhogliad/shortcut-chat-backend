@@ -17,6 +17,7 @@ class UserDeletedMessageFactoryImplTest: FreeSpec({
             val result = factory.create(body)
             result.type shouldBe "UserDeleted"
             result.version shouldBe "v1"
+            result.key shouldBe id.toString()
             result.body shouldBe body
         }
     }

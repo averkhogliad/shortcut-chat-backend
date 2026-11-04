@@ -108,6 +108,12 @@ class UserEndpointTest(
                 this["email"] shouldBe email
             }
             jdbc.countOutbox() shouldBe 2L
+            jdbc.findOutboxByEventName("UserCreated").shouldNotBeNull {
+                this["key"] shouldBe requireNotNull(created.id).toString()
+            }
+            jdbc.findOutboxByEventName("SendEmail").shouldNotBeNull {
+                this["key"] shouldBe null
+            }
         }
 
         "returns 400 when id is passed in body" {
@@ -160,6 +166,7 @@ class UserEndpointTest(
             jdbc.countOutbox() shouldBe 1L
             jdbc.findOutboxByEventName("UserUpdated").shouldNotBeNull {
                 this["topic"] shouldBe "UserLifecycle"
+                this["key"] shouldBe userId.toString()
             }
         }
 
@@ -208,6 +215,7 @@ class UserEndpointTest(
             jdbc.countOutbox() shouldBe 1L
             val outbox = jdbc.findOutboxByEventName("UserDeleted").shouldNotBeNull()
             outbox["topic"] shouldBe "UserLifecycle"
+            outbox["key"] shouldBe userId.toString()
             val bodyNode = mapper.readTree(outbox["body"].toString())
             bodyNode["id"].stringValue() shouldBe userId.toString()
         }

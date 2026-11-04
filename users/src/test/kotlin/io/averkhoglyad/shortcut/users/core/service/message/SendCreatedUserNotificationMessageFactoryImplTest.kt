@@ -5,6 +5,7 @@ import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.equals.shouldBeEqual
 import io.kotest.matchers.should
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import io.kotest.property.checkAll
@@ -18,6 +19,7 @@ class SendCreatedUserNotificationMessageFactoryImplTest : FreeSpec({
             val result = factory.create(user)
             result.type shouldBeEqual "SendCreatedUserNotification"
             result.version shouldBeEqual "v1"
+            result.key shouldBe null
             result.body should {
                 it.to shouldContainExactly listOf(user.email)
                 it.subject shouldBeEqual  "Welcome ${user.name}!"

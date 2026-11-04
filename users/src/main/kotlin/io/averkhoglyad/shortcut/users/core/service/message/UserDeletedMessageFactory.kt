@@ -10,6 +10,7 @@ class UserDeletedMessageFactoryImpl() : MessageFactory<UserDeleted, UserDeleted>
         return OutboxMessage(
             type = "UserDeleted",
             version = "v1",
+            key = user.id.toString(),
             body = user
         )
     }
