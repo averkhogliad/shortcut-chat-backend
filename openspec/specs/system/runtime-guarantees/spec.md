@@ -132,4 +132,4 @@ These are observed current behaviors, not requirements.
 
 - `mail-sender` stores `FAILED` and does not rethrow the exception. Retry and DLQ are not implemented.
 - `notifications` exposes a live-only SSE stream without replay.
-- Synchronization of `users` read models in `chats` and `messages` is not implemented.
+- `chats` and `messages` maintain a local `users` read model from `UserLifecycle` events; idempotency and ordering are defined in the requirements above.

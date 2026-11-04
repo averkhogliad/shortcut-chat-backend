@@ -8,7 +8,7 @@ Define the language, framework, build, persistence, messaging, observability, an
 
 ### Requirement: Language and framework versions
 
-The backend SHALL use Java 17, Kotlin 1.9.25, Spring Boot 3.4.0, and Maven 3.9.9 through Maven Wrapper 3.3.2.
+The backend SHALL use Java 17, Kotlin 2.4.21, Spring Boot 4.1.2 (Jackson 3, `tools.jackson.*`; JSON annotations remain `com.fasterxml.jackson.annotation`), and Maven 3.9.16 through Maven Wrapper 3.3.4.
 
 #### Scenario: Build toolchain
 
@@ -26,7 +26,7 @@ The backend SHALL use Java 17, Kotlin 1.9.25, Spring Boot 3.4.0, and Maven 3.9.9
 
 ### Requirement: Supporting libraries
 
-The backend SHALL use ShedLock 6.0.2, `java-uuid-generator` 5.1.0, and Jakarta Mail API 2.1.3.
+The backend SHALL use ShedLock 7.10.1, `java-uuid-generator` 5.2.0, Jakarta Mail API 2.1.5, and `loki-logback-appender` 2.0.3.
 
 #### Scenario: Scheduled jobs
 
@@ -62,7 +62,7 @@ The services SHALL expose Actuator and Prometheus metrics and SHALL use Micromet
 
 ### Requirement: Test stack
 
-Tests SHALL use Kotest 5.9.1, MockK 1.13.16, SpringMockK 4.0.2, JUnit Platform, and Testcontainers where infrastructure is required.
+Tests SHALL use Kotest 6.2.6, MockK 1.14.11, JUnit Platform, and Testcontainers 2.0.5 where infrastructure is required.
 
 #### Scenario: Unit test
 
@@ -71,7 +71,7 @@ Tests SHALL use Kotest 5.9.1, MockK 1.13.16, SpringMockK 4.0.2, JUnit Platform, 
 
 ### Requirement: Test infrastructure
 
-Test modules SHALL use `common-test/SpringAwareKotestConfig`, which provides `SpringExtension` and `SpringAutowireConstructorExtension`, and a module-local `src/test/resources/kotest.properties`. Test fixtures SHALL live under `src/test/resources/it/**` or `src/test/resources/repository/**`. All tests SHALL run in the `test` source set; no separate integration-test profile is configured.
+Test modules SHALL use `common-test/SpringAwareKotestConfig` (Kotest `SpringExtension`) and a module-local `src/test/resources/kotest.properties`. Infrastructure tests SHALL use Testcontainers 2 and Spring Boot 4 test modules. Test fixtures SHALL live under `src/test/resources/it/**` or `src/test/resources/repository/**`. All tests SHALL run in the `test` source set; no separate integration-test profile is configured.
 
 #### Scenario: Repository test
 

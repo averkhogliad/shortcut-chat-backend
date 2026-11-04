@@ -28,7 +28,7 @@
 - Jackson 3: координаты `tools.jackson.*`, аннотации остались `com.fasterxml.jackson.annotation`; Jackson 2 (databind/core) в коде отсутствует.
 - Тесты: Kotest 6.2.6 (`io.kotest:*`), MockK 1.14.11 (`mockk-jvm`), Testcontainers 2.0.5 (BOM). SpringMockK удалён: в коде не использовался, версии под Boot 4 нет.
 - Прочее: ShedLock 7.10.1, `java-uuid-generator` 5.2.0, `hypersistence-tsid` 2.1.4, Jakarta Mail API 2.1.5, `loki-logback-appender` 2.0.3 (2.1.0 требует Logback 1.6, Boot 4.1.2 управляет 1.5.38).
-- Сборка: Maven 3.9.16 через Maven Wrapper 3.3.4; `maven-surefire-plugin` 3.5.6 закреплён в `pluginManagement` — дефолтная для Maven 3.9.16 версия 3.0.0-M7 с Kotest 6 / JUnit Platform 6 даёт `Tests run: 0`.
+- Сборка: Maven 3.9.16 через Maven Wrapper 3.3.4; `maven-surefire-plugin` 3.5.6 закреплён в `pluginManagement` (версия Boot 4.1.2-managed; дефолт Maven 3.9.16 — 3.5.4) для стабильного репортинга Kotest 6 / JUnit Platform 6.
 
 ## Тестовая инфраструктура
 

@@ -139,7 +139,7 @@ The starter SHALL provide a default configuration-backed route resolver and SHAL
 
 ### Requirement: Outbox event headers are customizable
 
-The starter SHALL set event headers through a header provider. The default provider SHALL set the standard headers from `system/kafka-messaging` plus optional per-route static headers. A consuming service MAY supply its own header provider bean to override the default. The header provider interface and the `X-Event-*` constants SHALL live in the starter.
+The starter SHALL set event headers through a header provider. The default provider SHALL set the standard headers from `system/kafka-messaging` plus optional per-route static headers. A consuming service MAY supply its own header provider bean to override the default. The header provider interface SHALL live in the starter; the `X-Event-*` header-name constants SHALL live in `common` and the starter SHALL delegate to them.
 
 #### Scenario: Default headers are set
 
