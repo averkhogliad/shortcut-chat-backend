@@ -17,6 +17,7 @@ class UserConverterImpl : UserConverter {
             id = requireNotNull(entity.id),
             name = entity.name,
             email = entity.email,
+            deleted = entity.deleted,
         )
     }
 }

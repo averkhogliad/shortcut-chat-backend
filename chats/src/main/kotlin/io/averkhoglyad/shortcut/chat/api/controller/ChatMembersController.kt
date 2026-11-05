@@ -15,9 +15,12 @@ class ChatMembersController(
 ) {
 
     @GetMapping
-    fun members(@RequestParam(name = "chatId", required = false) chatIds: Collection<UUID> = emptyList()): Collection<ChatMembers> {
+    fun members(
+        @RequestParam(name = "chatId", required = false) chatIds: Collection<UUID> = emptyList(),
+        @RequestParam(name = "includeDeleted", required = false, defaultValue = "false") includeDeleted: Boolean,
+    ): Collection<ChatMembers> {
         return takeIf { chatIds.isNotEmpty() }
-            ?.let{ service.findMembersByIds(chatIds) }
+            ?.let{ service.findMembersByIds(chatIds, includeDeleted) }
             ?: emptyList()
     }
 }

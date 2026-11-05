@@ -24,7 +24,7 @@ interface ChatService {
 
     fun create(chat: ChatRequest): EntityResult<ChatDetails>
 
-    fun findMembersByIds(chatIds: Collection<UUID>): List<ChatMembers>
+    fun findMembersByIds(chatIds: Collection<UUID>, includeDeleted: Boolean = false): List<ChatMembers>
 }
 
 @Service
@@ -56,6 +56,9 @@ class ChatServiceImpl(
 
     @Transactional
     override fun create(chat: ChatRequest): EntityResult<ChatDetails> {
+        if (hasDeletedMembers(chat)) {
+            return EntityResult.Invalid("members reference deleted users")
+        }
         return repository.save(chat.toEntity())
             .let { it to userRepository.findByIdIsIn(it.memberIds) }
             .let { (entity, members) -> entity.toDetails(members) }
@@ -63,11 +66,11 @@ class ChatServiceImpl(
             .let { EntityResult.Success(it) }
     }
 
-    override fun findMembersByIds(chatIds: Collection<UUID>): List<ChatMembers> {
+    override fun findMembersByIds(chatIds: Collection<UUID>, includeDeleted: Boolean): List<ChatMembers> {
         if (chatIds.isEmpty()) {
             return emptyList()
         }
-        return repository.findMembersByChatIdIsIn(chatIds)
+        return repository.findMembersByChatIdIsIn(chatIds, includeDeleted)
             .groupBy { it.chat.id }
             .map { (chatId, entity) ->
                 ChatMembers(
@@ -80,6 +83,22 @@ class ChatServiceImpl(
     private fun emitChatCreatedLifecycleEvent(chat: ChatDetails) {
         chatCreatedMessageFactory.create(chat)
             .let { outboxEmitter.emit(it.type, it.version, it.key, it.body) }
+    }
+
+    private fun hasDeletedMembers(chat: ChatRequest): Boolean {
+        val memberIds = chat.members.map { it.id }.toSet()
+        if (memberIds.isEmpty()) {
+            return false
+        }
+        val activeMemberIds = userRepository.findByIdIsInAndDeletedFalse(memberIds)
+            .mapNotNull { it.id }
+            .toSet()
+        if (activeMemberIds.containsAll(memberIds)) {
+            return false
+        }
+        // ids missing from the non-deleted projection are either deleted or not projected at all
+        return userRepository.findByIdIsIn(memberIds)
+            .any { it.deleted }
     }
 
     private fun ChatRequest.toEntity(): ChatEntity = converter.toEntity(this)

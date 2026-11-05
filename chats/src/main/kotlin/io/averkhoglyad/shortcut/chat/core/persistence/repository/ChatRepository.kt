@@ -23,6 +23,13 @@ interface ChatRepository : Repository<ChatEntity, UUID> {
                                                        @Param("chatId") chatId: UUID,
                                                        pageable: Pageable): List<ChatEntity>
 
-    @Query("select m.* from chat_members m where m.chat_id IN (:chatIds)")
-    fun findMembersByChatIdIsIn(@Param("chatIds") chatIds: Collection<UUID>): List<MemberEntity>
+    @Query(
+        "select m.* from chat_members m " +
+            "where m.chat_id IN (:chatIds) " +
+            "and (:includeDeleted = true or not exists (" +
+            "select 1 from users u where u.id = m.user_id and u.is_deleted)) " +
+            "order by m.chat_id, m.user_id"
+    )
+    fun findMembersByChatIdIsIn(@Param("chatIds") chatIds: Collection<UUID>,
+                                @Param("includeDeleted") includeDeleted: Boolean): List<MemberEntity>
 }

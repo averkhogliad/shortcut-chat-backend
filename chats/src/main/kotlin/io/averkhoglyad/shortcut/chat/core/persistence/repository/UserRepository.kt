@@ -10,6 +10,8 @@ interface UserRepository : Repository<UserEntity, UUID> {
 
     fun findByIdIsIn(ids: Collection<UUID>): Collection<UserEntity>
 
+    fun findByIdIsInAndDeletedFalse(ids: Collection<UUID>): Collection<UserEntity>
+
     fun save(user: UserEntity): UserEntity
 
 }

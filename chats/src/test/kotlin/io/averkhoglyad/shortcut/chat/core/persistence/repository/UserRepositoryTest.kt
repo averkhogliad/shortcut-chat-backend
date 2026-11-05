@@ -144,6 +144,51 @@ class UserRepositoryTest(
             }
         }
     }
+
+    "findByIdIsInAndDeletedFalse" - {
+        beforeTest { executeSql(INIT) }
+        afterTest { executeSql(CLEAR) }
+
+        "returns only non-deleted Users for a mixed id set" {
+            // given
+            val givenIds = existsUserIds
+
+            // when
+            val result = target.findByIdIsInAndDeletedFalse(givenIds)
+
+            // then
+            result.mapNotNull { it.id }.toSet() shouldBe setOf(activeUserId)
+            result.forEach { it.deleted shouldBe false }
+        }
+
+        "returns the User when only active ids are requested" {
+            // given
+            val givenIds = listOf(activeUserId)
+
+            // when
+            val result = target.findByIdIsInAndDeletedFalse(givenIds)
+
+            // then
+            result.mapNotNull { it.id }.toSet() shouldBe setOf(activeUserId)
+        }
+
+        "returns empty collection if all requested Users are deleted" {
+            // given
+            val givenIds = listOf(deletedUserId)
+
+            // when
+            val result = target.findByIdIsInAndDeletedFalse(givenIds)
+
+            // then
+            result shouldBe emptyList()
+        }
+
+        "returns empty collection if Users are not projected" {
+            checkAll(Arb.uuid()) { givenId ->
+                target.findByIdIsInAndDeletedFalse(listOf(givenId)) shouldBe emptyList()
+            }
+        }
+    }
 })
 
 private fun JdbcClient.loadUserRow(id: UUID): Map<String, Any?>? {
@@ -154,10 +199,10 @@ private fun JdbcClient.loadUserRow(id: UUID): Map<String, Any?>? {
         .firstOrNull()
 }
 
-private val existsUserIds = listOf(
-    UUID.fromString("10000000-0000-0000-0000-000000000000"),
-    UUID.fromString("10000000-0000-0000-0000-000000000001")
-)
+private val deletedUserId = UUID.fromString("10000000-0000-0000-0000-000000000000")
+private val activeUserId = UUID.fromString("10000000-0000-0000-0000-000000000001")
+
+private val existsUserIds = listOf(deletedUserId, activeUserId)
 
 private fun UserEntity.apply(row: Map<String, Any?>): UserEntity {
     id = row["id"] as UUID

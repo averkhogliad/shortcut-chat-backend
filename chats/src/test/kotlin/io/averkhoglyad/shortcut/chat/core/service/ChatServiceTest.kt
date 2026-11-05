@@ -13,6 +13,7 @@ import io.averkhoglyad.shortcut.chat.core.persistence.repository.ChatRepository
 import io.averkhoglyad.shortcut.chat.core.persistence.repository.UserRepository
 import io.averkhoglyad.shortcut.chat.core.service.message.MessageFactory
 import io.averkhoglyad.shortcut.chat.core.service.message.OutboxMessage
+import io.averkhoglyad.shortcut.common.data.EntityResult.Invalid
 import io.averkhoglyad.shortcut.common.data.EntityResult.NotFound
 import io.averkhoglyad.shortcut.common.data.EntityResult.Success
 import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
@@ -126,35 +127,20 @@ class ChatServiceTest : FreeSpec({
     }
 
     "create" - {
-        "saves chat and emits exactly one outbox message" {
+        "saves chat and emits exactly one outbox message when all members are active" {
             // given
+            val memberIds = listOf(randomUUID(), randomUUID())
             val request = ChatRequest(
                 name = "chat",
-                members = listOf(UserRef(randomUUID()), UserRef(randomUUID())),
+                members = memberIds.map { UserRef(it) },
             )
             val entity = chatEntity()
             val saved = chatEntity()
-            val memberEntities = listOf(userEntity())
-            val details = ChatDetails(
-                id = requireNotNull(saved.id),
-                name = saved.name,
-                owner = null,
-                members = emptyList(),
-                createdAt = saved.createdAt,
-            )
-            val outboxMessage = OutboxMessage<ChatCreatedEvent>(
-                type = "ChatCreated",
-                version = "v1",
-                key = details.id.toString(),
-                body = ChatCreatedEvent(
-                    id = details.id,
-                    name = details.name,
-                    owner = null,
-                    members = emptyList(),
-                    createdAt = details.createdAt,
-                ),
-            )
+            val memberEntities = memberIds.map { userEntity(it) }
+            val details = chatDetails(saved)
+            val outboxMessage = chatCreatedMessage(details)
             every { converter.toEntity(request) } returns entity
+            every { userRepository.findByIdIsInAndDeletedFalse(any()) } returns memberEntities
             every { repository.save(entity) } returns saved
             every { userRepository.findByIdIsIn(any()) } returns memberEntities
             every { converter.toDetails(saved, memberEntities) } returns details
@@ -168,51 +154,191 @@ class ChatServiceTest : FreeSpec({
             result.shouldBeInstanceOf<Success<ChatDetails>>()
             result.entity shouldBeSameInstanceAs details
 
-            val type = slot<String>()
-            val version = slot<String>()
-            val key = slot<String>()
-            val body = slot<Any>()
-            verify(exactly = 1) {
-                outboxEmitter.emit(capture(type), capture(version), capture(key), capture(body))
-            }
-            type.captured shouldBe outboxMessage.type
-            version.captured shouldBe outboxMessage.version
-            key.captured shouldBe outboxMessage.key
-            body.captured shouldBeSameInstanceAs outboxMessage.body
+            val savedEntity = slot<ChatEntity>()
+            verify(exactly = 1) { repository.save(capture(savedEntity)) }
+            savedEntity.captured shouldBeSameInstanceAs entity
+
+            verifyChatCreatedEmittedOnce(outboxEmitter, outboxMessage)
+        }
+
+        "returns Invalid and writes nothing when a member is deleted" {
+            // given
+            val activeMemberId = randomUUID()
+            val deletedMemberId = randomUUID()
+            val request = ChatRequest(
+                name = "chat",
+                members = listOf(UserRef(activeMemberId), UserRef(deletedMemberId)),
+            )
+            every { userRepository.findByIdIsInAndDeletedFalse(any()) } returns listOf(userEntity(activeMemberId))
+            every { userRepository.findByIdIsIn(any()) } returns listOf(
+                userEntity(activeMemberId),
+                userEntity(deletedMemberId, deleted = true),
+            )
+
+            // when
+            val result = target.create(request)
+
+            // then
+            result.shouldBeInstanceOf<Invalid<ChatDetails>>()
+            verify(exactly = 0) { repository.save(any()) }
+            verify(exactly = 0) { outboxEmitter.emit(any(), any(), any(), any()) }
+        }
+
+        "saves chat when a member id is absent from the projection" {
+            // given
+            val knownMemberId = randomUUID()
+            val unknownMemberId = randomUUID()
+            val request = ChatRequest(
+                name = "chat",
+                members = listOf(UserRef(knownMemberId), UserRef(unknownMemberId)),
+            )
+            val entity = chatEntity()
+            val saved = chatEntity()
+            val memberEntities = listOf(userEntity(knownMemberId))
+            val details = chatDetails(saved)
+            val outboxMessage = chatCreatedMessage(details)
+            every { converter.toEntity(request) } returns entity
+            every { userRepository.findByIdIsInAndDeletedFalse(any()) } returns memberEntities
+            every { userRepository.findByIdIsIn(any()) } returns memberEntities
+            every { repository.save(entity) } returns saved
+            every { converter.toDetails(saved, memberEntities) } returns details
+            every { messageFactory.create(details) } returns outboxMessage
+            every { outboxEmitter.emit(any(), any(), any(), any()) } just Runs
+
+            // when
+            val result = target.create(request)
+
+            // then
+            result.shouldBeInstanceOf<Success<ChatDetails>>()
+            result.entity shouldBeSameInstanceAs details
+
+            val savedEntity = slot<ChatEntity>()
+            verify(exactly = 1) { repository.save(capture(savedEntity)) }
+            savedEntity.captured shouldBeSameInstanceAs entity
+
+            verifyChatCreatedEmittedOnce(outboxEmitter, outboxMessage)
+        }
+
+        "saves chat and emits exactly one outbox message when the member list is empty" {
+            // given
+            val request = ChatRequest(name = "chat", members = emptyList())
+            val entity = chatEntity()
+            val saved = chatEntity()
+            val details = chatDetails(saved)
+            val outboxMessage = chatCreatedMessage(details)
+            every { converter.toEntity(request) } returns entity
+            every { userRepository.findByIdIsIn(any()) } returns emptyList<UserEntity>()
+            every { repository.save(entity) } returns saved
+            every { converter.toDetails(saved, emptyList()) } returns details
+            every { messageFactory.create(details) } returns outboxMessage
+            every { outboxEmitter.emit(any(), any(), any(), any()) } just Runs
+
+            // when
+            val result = target.create(request)
+
+            // then
+            result.shouldBeInstanceOf<Success<ChatDetails>>()
+            result.entity shouldBeSameInstanceAs details
+
+            val savedEntity = slot<ChatEntity>()
+            verify(exactly = 1) { repository.save(capture(savedEntity)) }
+            savedEntity.captured shouldBeSameInstanceAs entity
+
+            verifyChatCreatedEmittedOnce(outboxEmitter, outboxMessage)
         }
     }
 
     "findMembersByIds" - {
         "returns empty list without querying repository when no chat ids passed" {
             // when
-            val result = target.findMembersByIds(emptyList())
+            val result = target.findMembersByIds(emptyList(), includeDeleted = false)
 
             // then
             result shouldBe emptyList()
-            verify(exactly = 0) { repository.findMembersByChatIdIsIn(any()) }
+            verify(exactly = 0) { repository.findMembersByChatIdIsIn(any(), any()) }
         }
 
-        "groups members by chat id" {
+        "resolves members for all chats with a single query and excludes deleted by default" {
             // given
             val firstChatId = randomUUID()
             val secondChatId = randomUUID()
             val firstUserId = randomUUID()
             val secondUserId = randomUUID()
-            val thirdUserId = randomUUID()
-            every { repository.findMembersByChatIdIsIn(listOf(firstChatId, secondChatId)) } returns listOf(
+            every {
+                repository.findMembersByChatIdIsIn(listOf(firstChatId, secondChatId), false)
+            } returns listOf(
                 memberEntity(firstChatId, firstUserId),
-                memberEntity(firstChatId, secondUserId),
-                memberEntity(secondChatId, thirdUserId),
+                memberEntity(secondChatId, secondUserId),
             )
 
             // when
-            val result = target.findMembersByIds(listOf(firstChatId, secondChatId))
+            val result = target.findMembersByIds(listOf(firstChatId, secondChatId), includeDeleted = false)
 
             // then
             result.associate { members -> members.id to members.members.map { it.id } } shouldBe mapOf(
-                firstChatId to listOf(firstUserId, secondUserId),
-                secondChatId to listOf(thirdUserId),
+                firstChatId to listOf(firstUserId),
+                secondChatId to listOf(secondUserId),
             )
+
+            val queriedChatIds = slot<Collection<UUID>>()
+            val queriedIncludeDeleted = slot<Boolean>()
+            verify(exactly = 1) {
+                repository.findMembersByChatIdIsIn(capture(queriedChatIds), capture(queriedIncludeDeleted))
+            }
+            queriedChatIds.captured shouldBe listOf(firstChatId, secondChatId)
+            queriedIncludeDeleted.captured shouldBe false
+        }
+
+        "resolves members for all chats with a single query and keeps deleted when includeDeleted is true" {
+            // given
+            val firstChatId = randomUUID()
+            val secondChatId = randomUUID()
+            val activeUserId = randomUUID()
+            val deletedUserId = randomUUID()
+            every {
+                repository.findMembersByChatIdIsIn(listOf(firstChatId, secondChatId), true)
+            } returns listOf(
+                memberEntity(firstChatId, activeUserId),
+                memberEntity(firstChatId, deletedUserId),
+                memberEntity(secondChatId, activeUserId),
+            )
+
+            // when
+            val result = target.findMembersByIds(listOf(firstChatId, secondChatId), includeDeleted = true)
+
+            // then
+            result.associate { members -> members.id to members.members.map { it.id } } shouldBe mapOf(
+                firstChatId to listOf(activeUserId, deletedUserId),
+                secondChatId to listOf(activeUserId),
+            )
+
+            val queriedChatIds = slot<Collection<UUID>>()
+            val queriedIncludeDeleted = slot<Boolean>()
+            verify(exactly = 1) {
+                repository.findMembersByChatIdIsIn(capture(queriedChatIds), capture(queriedIncludeDeleted))
+            }
+            queriedChatIds.captured shouldBe listOf(firstChatId, secondChatId)
+            queriedIncludeDeleted.captured shouldBe true
+        }
+
+        "returns empty list after a single query when chat id is unknown" {
+            // given
+            val unknownChatId = randomUUID()
+            every {
+                repository.findMembersByChatIdIsIn(listOf(unknownChatId), false)
+            } returns emptyList()
+
+            // when
+            val result = target.findMembersByIds(listOf(unknownChatId), includeDeleted = false)
+
+            // then
+            result shouldBe emptyList()
+
+            val queriedChatIds = slot<Collection<UUID>>()
+            verify(exactly = 1) {
+                repository.findMembersByChatIdIsIn(capture(queriedChatIds), false)
+            }
+            queriedChatIds.captured shouldBe listOf(unknownChatId)
         }
     }
 })
@@ -228,10 +354,47 @@ private fun chatEntity(
     this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
 }
 
-private fun userEntity(id: UUID = randomUUID()): UserEntity = UserEntity().apply {
+private fun userEntity(id: UUID = randomUUID(), deleted: Boolean = false): UserEntity = UserEntity().apply {
     this.id = id
     this.name = "user"
     this.email = "$id@example.com"
+    this.deleted = deleted
+}
+
+private fun chatDetails(entity: ChatEntity) = ChatDetails(
+    id = requireNotNull(entity.id),
+    name = entity.name,
+    owner = null,
+    members = emptyList(),
+    createdAt = entity.createdAt,
+)
+
+private fun chatCreatedMessage(details: ChatDetails) = OutboxMessage<ChatCreatedEvent>(
+    type = "ChatCreated",
+    version = "v1",
+    key = details.id.toString(),
+    body = ChatCreatedEvent(
+        id = details.id,
+        name = details.name,
+        owner = null,
+        members = emptyList(),
+        createdAt = details.createdAt,
+    ),
+)
+
+private fun verifyChatCreatedEmittedOnce(
+    emitter: OutboxEmitter,
+    expected: OutboxMessage<ChatCreatedEvent>,
+) {
+    val type = slot<String>()
+    val version = slot<String>()
+    val key = slot<String>()
+    val body = slot<Any>()
+    verify(exactly = 1) { emitter.emit(capture(type), capture(version), capture(key), capture(body)) }
+    type.captured shouldBe expected.type
+    version.captured shouldBe expected.version
+    key.captured shouldBe expected.key
+    body.captured shouldBeSameInstanceAs expected.body
 }
 
 private fun memberEntity(chatId: UUID, userId: UUID): MemberEntity = MemberEntity().apply {

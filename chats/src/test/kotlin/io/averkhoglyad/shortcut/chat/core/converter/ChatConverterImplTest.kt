@@ -42,6 +42,45 @@ class ChatConverterImplTest : FreeSpec({
             result.owner?.id shouldBe owner.id
             result.members.map { it.id } shouldContainExactlyInAnyOrder listOf(owner.id, member.id)
         }
+
+        "marks deleted owner and members" {
+            // given
+            val owner = userEntity(deleted = true)
+            val member = userEntity(deleted = true)
+            val entity = ChatEntity().apply {
+                this.id = randomUUID()
+                this.name = "chat"
+                this.owner = AggregateReference.to<UserEntity, UUID>(requireNotNull(owner.id))
+                this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
+            }
+
+            // when
+            val result = target.toDetails(entity, listOf(owner, member))
+
+            // then
+            result.owner?.deleted shouldBe true
+            result.members.map { it.id } shouldContainExactlyInAnyOrder listOf(owner.id, member.id)
+            result.members.forEach { it.deleted shouldBe true }
+        }
+
+        "leaves active owner and members unmarked" {
+            // given
+            val owner = userEntity()
+            val member = userEntity()
+            val entity = ChatEntity().apply {
+                this.id = randomUUID()
+                this.name = "chat"
+                this.owner = AggregateReference.to<UserEntity, UUID>(requireNotNull(owner.id))
+                this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
+            }
+
+            // when
+            val result = target.toDetails(entity, listOf(owner, member))
+
+            // then
+            result.owner?.deleted shouldBe false
+            result.members.forEach { it.deleted shouldBe false }
+        }
     }
 
     "toListItem" - {
@@ -115,10 +154,11 @@ class ChatConverterImplTest : FreeSpec({
     }
 })
 
-private fun userEntity(id: UUID = randomUUID()): UserEntity = UserEntity().apply {
+private fun userEntity(id: UUID = randomUUID(), deleted: Boolean = false): UserEntity = UserEntity().apply {
     this.id = id
     this.name = "user"
     this.email = "$id@example.com"
+    this.deleted = deleted
 }
 
 private fun memberEntity(userId: UUID, createdAt: Instant): MemberEntity = MemberEntity().apply {

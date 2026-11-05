@@ -27,7 +27,7 @@ class ChatMembersEndpointTest(
     afterEach { executeSql(CLEAR) }
 
     "GET /members" - {
-        "returns members for single chat" {
+        "returns active members for single chat by default" {
             val chatId = "00000000-0000-0000-0000-000000000001"
 
             mvc.perform(get("/members").queryParam("chatId", chatId))
@@ -39,7 +39,7 @@ class ChatMembersEndpointTest(
                 .andExpect(jsonPath("$[0].members[1].id").value("00000000-0000-0000-0000-000000000002"))
         }
 
-        "returns members for multiple chats" {
+        "returns active members for multiple chats by default" {
             val chatId1 = "00000000-0000-0000-0000-000000000001"
             val chatId2 = "00000000-0000-0000-0000-000000000002"
 
@@ -52,10 +52,57 @@ class ChatMembersEndpointTest(
                 .andExpect(jsonPath("$[1].members.length()").value(1))
         }
 
+        "excludes deleted members when includeDeleted is false" {
+            val chatId = "00000000-0000-0000-0000-000000000001"
+
+            mvc.perform(get("/members").queryParam("chatId", chatId).queryParam("includeDeleted", "false"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].members.length()").value(2))
+                .andExpect(jsonPath("$[0].members[0].id").value("00000000-0000-0000-0000-000000000001"))
+                .andExpect(jsonPath("$[0].members[1].id").value("00000000-0000-0000-0000-000000000002"))
+        }
+
+        "includes deleted members when includeDeleted is true" {
+            val chatId = "00000000-0000-0000-0000-000000000001"
+
+            mvc.perform(get("/members").queryParam("chatId", chatId).queryParam("includeDeleted", "true"))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].members.length()").value(3))
+                .andExpect(jsonPath("$[0].members[0].id").value("00000000-0000-0000-0000-000000000001"))
+                .andExpect(jsonPath("$[0].members[1].id").value("00000000-0000-0000-0000-000000000002"))
+                .andExpect(jsonPath("$[0].members[2].id").value("00000000-0000-0000-0000-000000000004"))
+        }
+
+        "includes deleted members for multiple chats when includeDeleted is true" {
+            val chatId1 = "00000000-0000-0000-0000-000000000001"
+            val chatId2 = "00000000-0000-0000-0000-000000000002"
+
+            mvc.perform(
+                get("/members")
+                    .queryParam("chatId", chatId1, chatId2)
+                    .queryParam("includeDeleted", "true")
+            )
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].members.length()").value(3))
+                .andExpect(jsonPath("$[1].members.length()").value(2))
+                .andExpect(jsonPath("$[1].members[1].id").value("00000000-0000-0000-0000-000000000005"))
+        }
+
         "returns empty collection for non-existent chat" {
             val nonExistentChatId = "00000000-0000-0000-0000-000000000999"
 
             mvc.perform(get("/members").queryParam("chatId", nonExistentChatId))
+                .andExpect(status().isOk)
+                .andExpect(jsonPath("$.length()").value(0))
+        }
+
+        "returns empty collection for non-existent chat when includeDeleted is true" {
+            val nonExistentChatId = "00000000-0000-0000-0000-000000000999"
+
+            mvc.perform(get("/members").queryParam("chatId", nonExistentChatId).queryParam("includeDeleted", "true"))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(0))
         }

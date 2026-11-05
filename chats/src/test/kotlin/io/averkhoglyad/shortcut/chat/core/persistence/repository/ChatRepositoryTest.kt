@@ -149,7 +149,7 @@ class ChatRepositoryTest(
 
         "loads Chat Members correctly" {
             checkAll(existsChatIds.exhaustive()) { givenId ->
-                val result = target.findMembersByChatIdIsIn(listOf(givenId))
+                val result = target.findMembersByChatIdIsIn(listOf(givenId), includeDeleted = false)
 
                 val rows = jdbc.loadChatMemberRows(givenId)
 
