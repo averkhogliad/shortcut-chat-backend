@@ -7,6 +7,8 @@ import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.message.core.model.ChatRef
 import io.averkhoglyad.shortcut.message.core.model.Message
 import io.averkhoglyad.shortcut.message.core.model.MessageRequest
+import io.averkhoglyad.shortcut.message.core.service.chatCreatedPayloads
+import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FreeSpec
 import io.kotest.matchers.maps.shouldContain
@@ -14,7 +16,11 @@ import io.kotest.matchers.maps.shouldContainKeys
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.should
 import io.kotest.matchers.shouldBe
+import io.kotest.property.Arb
+import io.kotest.property.arbitrary.next
+import io.kotest.property.arbitrary.string
 import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.common.header.Headers
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
@@ -31,7 +37,10 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.*
+import kotlin.time.Duration.Companion.seconds
 
 private const val INIT = "/it/init.sql"
 private const val CLEAR = "/it/clear.sql"
@@ -45,6 +54,7 @@ class MessageEndpointTest(
     val jdbc: JdbcClient,
     val mapper: ObjectMapper,
     val kafkaConsumerProvider: (List<String>) -> KafkaConsumer<String, String>,
+    val kafkaProducer: KafkaProducer<String, Any>,
 ) : FreeSpec() {
 
     init {
@@ -228,6 +238,40 @@ class MessageEndpointTest(
                 )
                     .andExpect(status().isBadRequest)
                     .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+            }
+
+            "creates message for chat synchronized via ChatCreated" {
+                // given
+                val chat = Arb.chatCreatedPayloads().next()
+                val chatId = chat.id
+                val eventTime = Instant.now().truncatedTo(ChronoUnit.MILLIS)
+                kafkaProducer.send(chatCreatedRecord(chat, eventTime)).get()
+                eventually(10.seconds) {
+                    jdbc.loadChatRow(chatId).shouldNotBeNull()
+                }
+                val userId = "11111111-1111-1111-1111-111111111111"
+                val messageText = Arb.string(1..100).next()
+                val request = MessageRequest(
+                    text = messageText,
+                    chat = ChatRef(chatId),
+                )
+
+                // when
+                val response = post("/messages")
+                    .header("X-User-Id", userId)
+                    .contentType(APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(request))
+                    .perform()
+
+                // then
+                response.andExpect(status().isOk)
+                    .andExpect(jsonPath("$.text").value(messageText))
+                    .andExpect(jsonPath("$.chat.id").value(chatId.toString()))
+
+                val message = mapper.readValue(response.andReturn().response.contentAsString, Message::class.java)
+                val messageRow = jdbc.loadMessageRow(message.id).shouldNotBeNull()
+                messageRow["chat_id"] shouldBe chatId
+                messageRow["text"] shouldBe messageText
             }
         }
     }

@@ -1,5 +1,6 @@
 package io.averkhoglyad.shortcut.message.config
 
+import io.averkhoglyad.shortcut.message.kafka.ChatLifecycleTypeResolver
 import io.averkhoglyad.shortcut.message.kafka.UserLifecycleTypeResolver
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.springframework.beans.factory.ObjectProvider
@@ -16,6 +17,7 @@ import org.springframework.kafka.listener.ConcurrentMessageListenerContainer
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer
 
 const val KAFKA_LISTENER_USER_LIFECYCLE = "KAFKA_LISTENER_USER_LIFECYCLE"
+const val KAFKA_LISTENER_CHAT_LIFECYCLE = "KAFKA_LISTENER_CHAT_LIFECYCLE"
 
 @Configuration
 class KafkaConfig(
@@ -24,6 +26,7 @@ class KafkaConfig(
     private val kafkaProperties: KafkaProperties,
     private val kafkaConnectionDetails: KafkaConnectionDetails,
     private val userLifecycleTypeResolver: UserLifecycleTypeResolver,
+    private val chatLifecycleTypeResolver: ChatLifecycleTypeResolver,
 ) {
 
     @Bean(KAFKA_LISTENER_USER_LIFECYCLE)
@@ -32,10 +35,23 @@ class KafkaConfig(
         return kafkaListenerContainerFactory(consumerFactory)
     }
 
+    @Bean(KAFKA_LISTENER_CHAT_LIFECYCLE)
+    fun chatLifecycleKafkaListenerContainerFactory(): ConcurrentKafkaListenerContainerFactory<String, Any> {
+        val consumerFactory = chatLifecycleConsumerFactory()
+        return kafkaListenerContainerFactory(consumerFactory)
+    }
+
     private fun userLifecycleConsumerFactory(): ConsumerFactory<String, Any> = consumerFactory {
         val jsonDeserializer = JacksonJsonDeserializer<Any>()
         jsonDeserializer.setUseTypeHeaders(false)
         jsonDeserializer.setTypeResolver(userLifecycleTypeResolver)
+        setValueDeserializerSupplier { jsonDeserializer }
+    }
+
+    private fun chatLifecycleConsumerFactory(): ConsumerFactory<String, Any> = consumerFactory {
+        val jsonDeserializer = JacksonJsonDeserializer<Any>()
+        jsonDeserializer.setUseTypeHeaders(false)
+        jsonDeserializer.setTypeResolver(chatLifecycleTypeResolver)
         setValueDeserializerSupplier { jsonDeserializer }
     }
 

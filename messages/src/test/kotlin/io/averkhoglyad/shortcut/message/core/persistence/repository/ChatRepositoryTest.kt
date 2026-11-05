@@ -1,7 +1,6 @@
 package io.averkhoglyad.shortcut.message.core.persistence.repository
 
 import io.averkhoglyad.shortcut.common.test.asInstantColumn
-import io.averkhoglyad.shortcut.common.test.betweenInclusive
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.message.config.PersistenceConfig
@@ -30,7 +29,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
 import java.sql.Timestamp
-import java.time.Instant
 import java.util.*
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -57,16 +55,15 @@ class ChatRepositoryTest(
             checkAll(Arb.chatEntities(members = members)) { givenEntity ->
                 // given
                 val givenName = givenEntity.name
+                val givenLastSyncAt = givenEntity.lastSyncAt
 
                 // when
-                val beforeSave = Instant.now()
                 val result = target.save(givenEntity)
-                val afterSave = Instant.now()
 
                 // then
                 val persistedId = result.id
                 persistedId.shouldNotBeNull()
-                result.lastSyncAt shouldBe betweenInclusive(beforeSave, afterSave)
+                result.lastSyncAt shouldBe givenLastSyncAt
 
                 jdbc.loadChatRow(persistedId).shouldNotBeNull {
                     this shouldContain ("name" to givenName)
@@ -87,12 +84,14 @@ class ChatRepositoryTest(
                 // given
                 val givenId = givenEntity.id!!
                 val givenName = givenEntity.name
+                val givenLastSyncAt = givenEntity.lastSyncAt
 
                 // when
                 val result = target.save(givenEntity)
 
                 // then
                 result.id shouldNotBeNull { this shouldBeEqual givenId }
+                result.lastSyncAt shouldBe givenLastSyncAt
 
                 jdbc.loadChatRow(givenId).shouldNotBeNull {
                     this shouldContain ("name" to givenName)

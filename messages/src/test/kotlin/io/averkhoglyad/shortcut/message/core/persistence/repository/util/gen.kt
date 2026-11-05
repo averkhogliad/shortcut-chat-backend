@@ -11,6 +11,8 @@ import io.kotest.property.arbitrary.*
 import io.kotest.property.exhaustive.of
 import org.springframework.data.jdbc.core.mapping.AggregateReference
 import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
 import java.util.*
 
 fun Arb.Companion.userEntities(
@@ -34,21 +36,41 @@ fun Arb.Companion.userEntities(
         }
 }
 
+/**
+ * `chats.last_sync_at` is declared as `TIMESTAMP` without time zone, so an [Instant] passes
+ * through the JVM default zone on write and on read. A local time that falls into a DST
+ * fall-back overlap is ambiguous: the read side resolves it with a different offset and the
+ * value comes back shifted by the overlap duration. Only instants that survive the round trip
+ * unchanged are generated, which keeps the property stable in any runner zone. The range is
+ * bounded to recent timestamps like [userEntities] does.
+ */
+private fun Arb.Companion.timestampRoundTripInstants(
+    range: ClosedRange<Instant> = Instant.parse("2020-01-01T00:00:00Z")..Instant.now(),
+): Arb<Instant> = Arb.javaInstant(range).filter { it.roundTripsThroughSystemZone() }
+
+private fun Instant.roundTripsThroughSystemZone(): Boolean {
+    val zone = ZoneId.systemDefault()
+    return LocalDateTime.ofInstant(this, zone).atZone(zone).toInstant() == this
+}
+
 fun Arb.Companion.chatEntities(
     ids: Gen<UUID?> = Exhaustive.of(null),
     members: Gen<Set<MemberEntity>> = Arb.set(Arb.memberEntities(), 2..5),
+    lastSyncAt: Gen<Instant> = Arb.timestampRoundTripInstants(),
 ): Arb<ChatEntity> = Arb.bind(
     ids,
     Arb.string(),
     members,
     Arb.boolean(),
-) { id, name, memberEntities, deleted, ->
+    lastSyncAt,
+) { id, name, memberEntities, deleted, syncAt ->
     ChatEntity()
         .apply {
             this.id = id
             this.name = name
             this.members = memberEntities
             this.deleted = deleted
+            this.lastSyncAt = syncAt
         }
 }
 
