@@ -15,7 +15,7 @@
 - [x] 2.4 `chats`: add test — `POST /chats` with deleted member returns 400 `ProblemDetail`.
 - [x] 2.5 `chats`: add test — `GET /chats/{id}` shows deleted member with `deleted: true`.
 - [x] 2.6 `chats`: add test — `GET /members` excludes deleted by default, includes with `includeDeleted=true`.
-- [ ] 2.7 `messages`: no code change required (deleted author permitted).
+- [x] 2.7 `messages`: no code change required (deleted author permitted).
 
 ## 3. Archive
 
