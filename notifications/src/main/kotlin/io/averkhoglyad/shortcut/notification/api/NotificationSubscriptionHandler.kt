@@ -3,6 +3,7 @@ package io.averkhoglyad.shortcut.notification.api
 import com.fasterxml.jackson.annotation.JsonValue
 import io.averkhoglyad.shortcut.common.util.info
 import io.averkhoglyad.shortcut.common.util.slf4j
+import io.averkhoglyad.shortcut.notification.data.ChatEventWithMembers
 import io.averkhoglyad.shortcut.notification.data.ChatLifecycleEvent
 import io.averkhoglyad.shortcut.notification.data.DebugEvent
 import io.averkhoglyad.shortcut.notification.service.NotificationService
@@ -32,13 +33,7 @@ class NotificationSubscriptionHandler(
             ?: throw IllegalArgumentException("User ID header must be passed")
 
         val events = service.events()
-            .map { events ->
-                events
-                    .filter { el -> el.event is DebugEvent || el.members.any { it.id == userId } }
-                    .map { it.event }
-                    .sortedBy { it.createdAt }
-                    .let { EventsResponse(it) }
-            }
+            .map { events -> EventsResponse(events.visibleTo(userId)) }
             .onStart { log.info("started") }
             .onEach { log.info("received {}", it) }
             .onCompletion { err ->
@@ -55,3 +50,13 @@ class NotificationSubscriptionHandler(
 
 
 data class EventsResponse(@JsonValue val events: List<ChatLifecycleEvent>)
+
+/**
+ * The audience of a subscription is the member list returned by `chats` (`GET /members`).
+ * Deleted users are filtered out there by default, so they are absent here — the subscriber
+ * only receives events of chats whose returned member list contains them.
+ */
+internal fun List<ChatEventWithMembers>.visibleTo(userId: UUID): List<ChatLifecycleEvent> =
+    filter { el -> el.event is DebugEvent || el.members.any { it.id == userId } }
+        .map { it.event }
+        .sortedBy { it.createdAt }
