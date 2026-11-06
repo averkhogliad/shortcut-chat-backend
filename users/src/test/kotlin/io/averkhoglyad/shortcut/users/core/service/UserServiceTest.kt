@@ -1,5 +1,6 @@
 package io.averkhoglyad.shortcut.users.core.service
 
+import io.averkhoglyad.shortcut.common.data.EntityResult.Invalid
 import io.averkhoglyad.shortcut.common.data.EntityResult.NotFound
 import io.averkhoglyad.shortcut.common.data.EntityResult.Success
 import io.averkhoglyad.shortcut.outbox.autoconfigure.OutboxEmitter
@@ -187,11 +188,56 @@ class UserServiceTest : FreeSpec({
             confirmVerified(repository)
         }
 
+        "returns Invalid and keeps stored state when email changes" {
+            // given
+            val id = randomUUID()
+            val entity = userEntities.next()
+            val input = users.next()
+                .copy(id = id, email = "${entity.email}.changed")
+            every { repository.findById(id) } returns entity
+
+            // when
+            val result = service.update(input)
+
+            // then
+            result shouldBe Invalid("Email is immutable")
+
+            verify { repository.findById(id) }
+            verify(exactly = 0) { repository.save(any()) }
+            verify(exactly = 0) { converter.toEntity(any(), any()) }
+            verify(exactly = 0) { userUpdatedMessageFactory.create(any()) }
+            verify(exactly = 0) { outboxEmitter.emit(any(), any(), any(), any()) }
+            confirmVerified(repository, converter, userUpdatedMessageFactory, outboxEmitter)
+        }
+
+        "rejects a case-only email change" {
+            // given
+            val id = randomUUID()
+            val entity = userEntities.next().apply {
+                this.id = id
+                this.email = "User@Example.com"
+            }
+            val input = User(id = id, name = entity.name, email = "user@example.com")
+            every { repository.findById(id) } returns entity
+
+            // when
+            val result = service.update(input)
+
+            // then
+            result shouldBe Invalid("Email is immutable")
+
+            verify { repository.findById(id) }
+            verify(exactly = 0) { repository.save(any()) }
+            verify(exactly = 0) { userUpdatedMessageFactory.create(any()) }
+            verify(exactly = 0) { outboxEmitter.emit(any(), any(), any(), any()) }
+            confirmVerified(repository, converter, userUpdatedMessageFactory, outboxEmitter)
+        }
+
         "returns Success response with updated user and emits UserUpdated" {
             // given
             val id = randomUUID()
             val entity = userEntities.next()
-            val input = users.next().copy(id = id)
+            val input = users.next().copy(id = id, email = entity.email)
             val output = users.next().copy(id = id)
             val updatedMessage = OutboxMessage("UserUpdated", "v1", null, output)
 

@@ -34,6 +34,17 @@ The `users` service SHALL expose these endpoints:
 - **THEN** the response status SHALL be `404`
 - **AND** the response body SHALL be a `ProblemDetail`.
 
+#### Scenario: Email is immutable
+
+- **WHEN** `PUT /users/{id}` is called with an `email` field that differs from the existing user's email
+- **THEN** the response status SHALL be `400`
+- **AND** the response body SHALL be a `ProblemDetail`.
+
+#### Scenario: POST /users requires admin role
+
+- **WHEN** `POST /users` is called without an admin role
+- **THEN** the response status SHALL be `403`.
+
 ### Requirement: Chats REST endpoints
 
 The `chats` service SHALL expose these endpoints:
@@ -171,3 +182,35 @@ Endpoints that require a user identity SHALL read it from the `X-User-Id` header
 
 - **WHEN** `GET /subscribe` is called
 - **THEN** the `userId` query parameter SHALL identify the subscriber.
+
+### Requirement: Auth REST endpoints
+
+The `users` service SHALL expose these authentication endpoints:
+
+| Method | Path | Response |
+|---|---|---|
+| `POST` | `/auth/code` | 202 Accepted |
+| `POST` | `/oauth2/token` | OAuth2 Token Response |
+| `GET` | `/.well-known/openid-configuration` | OIDC Discovery Document |
+| `GET` | `/oauth2/jwks` | JWK Set |
+| `GET` | `/userinfo` | UserInfo Claims |
+
+#### Scenario: Request OTP code
+
+- **WHEN** `POST /auth/code` is called with a valid email
+- **THEN** the response status SHALL be `202 Accepted`.
+
+#### Scenario: Request OTP code rate limited
+
+- **WHEN** `POST /auth/code` is called for the same email more than once within 60 seconds
+- **THEN** the response status SHALL be `429`.
+
+#### Scenario: Token endpoint with email OTP grant
+
+- **WHEN** `POST /oauth2/token` is called with `grant_type=urn:shortcut:oauth:grant-type:email-otp`, `email`, and `code`
+- **THEN** the response SHALL contain `access_token`, `id_token`, `refresh_token`, `token_type=Bearer`, and `expires_in`.
+
+#### Scenario: OIDC discovery
+
+- **WHEN** `GET /.well-known/openid-configuration` is called
+- **THEN** the response SHALL contain `issuer`, `token_endpoint`, `jwks_uri`, `userinfo_endpoint`, and `grant_types_supported` including `urn:shortcut:oauth:grant-type:email-otp`.

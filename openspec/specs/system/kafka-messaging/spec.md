@@ -94,7 +94,16 @@ The system SHALL use the following payload structures:
 
 ### Requirement: Serialization per producer
 
-`users` and `chats` SHALL publish JSON bytes produced by the outbox serializer. `messages` SHALL publish JSON with `spring.json.use.type.headers=false`. `mail-sender` SHALL consume JSON with type headers disabled. `notifications` SHALL resolve the payload type from `X-Event-Name`. `chats` and `messages` SHALL resolve the `UserLifecycle` payload type from `X-Event-Name` with JSON type headers disabled. `messages` SHALL resolve the `ChatLifecycle` payload type from `X-Event-Name` with JSON type headers disabled.
+`users` and `chats` SHALL publish JSON bytes produced by the outbox serializer. `messages` SHALL publish JSON with `spring.json.use.type.headers=false`.
+
+#### Scenario: Producer serialization
+
+- **WHEN** `users`, `chats`, or `messages` publishes an event
+- **THEN** `users` and `chats` SHALL publish JSON bytes produced by the outbox serializer and `messages` SHALL publish JSON with `spring.json.use.type.headers=false`.
+
+### Requirement: Consumer payload type resolution
+
+`mail-sender` SHALL consume JSON with type headers disabled. `notifications` SHALL resolve the payload type from `X-Event-Name`. `chats` and `messages` SHALL resolve the `UserLifecycle` payload type from `X-Event-Name` with JSON type headers disabled. `messages` SHALL resolve the `ChatLifecycle` payload type from `X-Event-Name` with JSON type headers disabled.
 
 #### Scenario: Consume a message event
 

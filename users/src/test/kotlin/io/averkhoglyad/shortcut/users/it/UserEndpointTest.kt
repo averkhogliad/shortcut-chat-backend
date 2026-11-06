@@ -146,7 +146,7 @@ class UserEndpointTest(
         "updates existing user and writes UserUpdated outbox record" {
             // given
             val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
-            val request = User(id = null, name = "Updated User", email = "updated@example.com")
+            val request = User(id = null, name = "Updated User", email = "user1@example.com")
 
             // when
             mvc.perform(
@@ -157,17 +157,40 @@ class UserEndpointTest(
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.id").value(userId.toString()))
                 .andExpect(jsonPath("$.name").value("Updated User"))
+                .andExpect(jsonPath("$.email").value("user1@example.com"))
 
             // then
             jdbc.loadUserRow(userId).shouldNotBeNull {
                 this["name"] shouldBe "Updated User"
-                this["email"] shouldBe "updated@example.com"
+                this["email"] shouldBe "user1@example.com"
             }
             jdbc.countOutbox() shouldBe 1L
             jdbc.findOutboxByEventName("UserUpdated").shouldNotBeNull {
                 this["topic"] shouldBe "UserLifecycle"
                 this["key"] shouldBe userId.toString()
             }
+        }
+
+        "returns 400 and leaves the user unchanged when email changes" {
+            // given
+            val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+            val request = User(id = null, name = "Updated User", email = "changed@example.com")
+
+            // when
+            mvc.perform(
+                put("/users/$userId")
+                    .contentType(APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(request))
+            )
+                .andExpect(status().isBadRequest)
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+
+            // then
+            jdbc.loadUserRow(userId).shouldNotBeNull {
+                this["name"] shouldBe "User One"
+                this["email"] shouldBe "user1@example.com"
+            }
+            jdbc.countOutbox() shouldBe 0L
         }
 
         "returns 400 when body id differs from path id" {

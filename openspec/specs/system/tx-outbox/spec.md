@@ -165,28 +165,36 @@ The core SHALL implement outbox persistence with Spring `JdbcClient` over the co
 - **WHEN** a service depends on `tx-outbox-starter`
 - **THEN** the service's own Spring Data JDBC repositories SHALL continue to be discovered without any change to `@EnableJdbcRepositories`.
 
-### Requirement: Outbox activation is gated
+### Requirement: Outbox activation preconditions
 
 The starter SHALL activate the outbox runtime only when all of the following hold: `tx-outbox.enabled=true`; a `JdbcClient` bean is available; an `ObjectMapper` bean is available; and at least one publication capability is available, where a publication capability is a consumer-provided `OutboxPublisher` bean **or** a `KafkaTemplate` bean. The two publication capabilities SHALL be alternatives, not cumulative requirements.
 
-The activation decision SHALL be evaluated against the bean definitions registered in the application context at bean-definition registration time, and SHALL NOT depend on the order in which auto-configurations contribute their bean definitions. The starter SHALL express its dependence on the auto-configurations that provide `JdbcClient`, `ObjectMapper`, and `KafkaTemplate` through the auto-configuration `after` attribute, and SHALL NOT rely on a fixed evaluation order or on hard-coded bean names.
+#### Scenario: Activation requires every precondition
 
-When a consumer-provided `OutboxPublisher` bean exists, the starter SHALL use that bean and SHALL NOT register its default publisher. When no consumer `OutboxPublisher` exists and a `KafkaTemplate` bean is available, the starter SHALL register the default `KafkaTemplate`-backed publisher named `kafkaTemplateOutboxPublisher`.
+- **WHEN** the starter evaluates whether to activate the outbox runtime
+- **THEN** it SHALL activate the runtime only when `tx-outbox.enabled=true`, a `JdbcClient` bean is available, an `ObjectMapper` bean is available, and at least one publication capability (`OutboxPublisher` bean or `KafkaTemplate` bean) is available.
 
-When activation holds, the starter SHALL register the runtime composition: `kafkaTemplateOutboxPublisher` (unless a consumer publisher overrides it), `outboxRelay`, `outboxCleaner`, the dedicated scheduler named `outboxTaskScheduler`, outbox metrics, and the relay and cleanup scheduling configuration. The `outboxCleaner` SHALL be suppressed when `tx-outbox.cleanup.enabled=false`. Metrics SHALL bind to an available `MeterRegistry` and SHALL fall back to a `SimpleMeterRegistry` when none is present.
+### Requirement: Outbox runtime composition
 
-The relay and cleanup scheduling SHALL each support a fixed-delay mode and a cron mode, independently for the relay and for the cleanup. The relay SHALL default to fixed-delay mode and the cleanup SHALL default to cron mode; each default SHALL apply when the corresponding `mode` property is not set. The scheduled relay and cleanup SHALL run on the dedicated `outboxTaskScheduler`, SHALL be guarded against concurrent execution by ShedLock under the lock names `outbox-relay` and `outbox-cleanup`, and SHALL be excluded under the `test` profile. Scheduling SHALL be globally suppressible through `tx-outbox.scheduler.enabled`.
-
-Every relay cycle SHALL perform inline recovery of expired leases and release of entries whose retry time is due before claiming new entries, within the same cycle.
-
-When activation does not hold, the starter SHALL NOT register any runtime bean — no publisher, relay, cleaner, scheduler, metrics, or scheduling configuration. When only the publication capability is missing, the outbox write path (`OutboxDao`, `OutboxWriter`, `OutboxRouter`, `OutboxHeaderProvider`, `OutboxEmitter`) SHALL remain registered; when `JdbcClient` or `ObjectMapper` is missing, no outbox write-path or runtime bean SHALL be registered. In every inactive state the starter SHALL report the inactive runtime once at `ApplicationReadyEvent` through `OutboxActivationReporter`, with a warning naming every missing precondition among `JdbcClient`, `ObjectMapper` and the publication capability.
-
-When `tx-outbox.enabled=false`, the starter SHALL NOT register any runtime bean.
+When activation holds, the starter SHALL register the runtime composition: `kafkaTemplateOutboxPublisher` (unless a consumer publisher overrides it), `outboxRelay`, `outboxCleaner`, the dedicated scheduler named `outboxTaskScheduler`, outbox metrics, and the relay and cleanup scheduling configuration.
 
 #### Scenario: KafkaTemplate only
 
 - **WHEN** the context has `tx-outbox.enabled=true`, a `JdbcClient` bean, an `ObjectMapper` bean, and a `KafkaTemplate` bean contributed by Kafka auto-configuration, and no consumer `OutboxPublisher`
 - **THEN** the starter SHALL register exactly one `OutboxPublisher` (its default `kafkaTemplateOutboxPublisher`), one `OutboxRelay`, one `OutboxCleaner`, the `outboxTaskScheduler`, the outbox metrics, and the relay and cleanup scheduling configuration, and no inactive-runtime warning SHALL be logged.
+
+### Requirement: Optional runtime components
+
+The `outboxCleaner` SHALL be suppressed when `tx-outbox.cleanup.enabled=false`. Metrics SHALL bind to an available `MeterRegistry` and SHALL fall back to a `SimpleMeterRegistry` when none is present.
+
+#### Scenario: Cleanup and metrics components
+
+- **WHEN** activation holds
+- **THEN** the `outboxCleaner` SHALL be suppressed when `tx-outbox.cleanup.enabled=false`, and metrics SHALL bind to an available `MeterRegistry` with a `SimpleMeterRegistry` fallback when none is present.
+
+### Requirement: Outbox publisher selection
+
+When a consumer-provided `OutboxPublisher` bean exists, the starter SHALL use that bean and SHALL NOT register its default publisher. When no consumer `OutboxPublisher` exists and a `KafkaTemplate` bean is available, the starter SHALL register the default `KafkaTemplate`-backed publisher named `kafkaTemplateOutboxPublisher`.
 
 #### Scenario: Consumer publisher with KafkaTemplate
 
@@ -198,10 +206,18 @@ When `tx-outbox.enabled=false`, the starter SHALL NOT register any runtime bean.
 - **WHEN** the context has `tx-outbox.enabled=true`, `JdbcClient`, `ObjectMapper`, a consumer-provided `OutboxPublisher` bean, and no `KafkaTemplate` bean
 - **THEN** the starter SHALL register `OutboxRelay`, `OutboxCleaner`, `outboxTaskScheduler`, the outbox metrics, and the scheduling configuration, and exactly one `OutboxPublisher` bean SHALL exist — the consumer's, without `kafkaTemplateOutboxPublisher`.
 
+### Requirement: Outbox write path when publication capability is missing
+
+When only the publication capability is missing, the outbox write path (`OutboxDao`, `OutboxWriter`, `OutboxRouter`, `OutboxHeaderProvider`, `OutboxEmitter`) SHALL remain registered; when `JdbcClient` or `ObjectMapper` is missing, no outbox write-path or runtime bean SHALL be registered.
+
 #### Scenario: No publication capability
 
 - **WHEN** the context has `tx-outbox.enabled=true`, `JdbcClient`, and `ObjectMapper`, but neither a `KafkaTemplate` bean nor a consumer `OutboxPublisher` bean
 - **THEN** the starter SHALL register no `OutboxPublisher`, `OutboxRelay`, `OutboxCleaner`, `ThreadPoolTaskScheduler`, outbox metrics, or scheduling configuration, SHALL keep the write path (`OutboxDao`, `OutboxWriter`, `OutboxRouter`, `OutboxHeaderProvider`, `OutboxEmitter`) registered, and after `ApplicationReadyEvent` SHALL log exactly one WARN from `OutboxActivationReporter` containing `outbox runtime is inactive` and the missing capability name `OutboxPublisher`.
+
+### Requirement: Inactive outbox runtime
+
+When activation does not hold, the starter SHALL NOT register any runtime bean — no publisher, relay, cleaner, scheduler, metrics, or scheduling configuration. In every inactive state the starter SHALL report the inactive runtime once at `ApplicationReadyEvent` through `OutboxActivationReporter`, with a warning naming every missing precondition among `JdbcClient`, `ObjectMapper` and the publication capability. When `tx-outbox.enabled=false`, the starter SHALL NOT register any runtime bean.
 
 #### Scenario: Starter is disabled
 
@@ -217,6 +233,37 @@ When `tx-outbox.enabled=false`, the starter SHALL NOT register any runtime bean.
 
 - **WHEN** the context has `tx-outbox.enabled=true`, `JdbcClient`, and a `KafkaTemplate`, but no `ObjectMapper`
 - **THEN** the starter SHALL register neither runtime beans nor write-path beans, and after `ApplicationReadyEvent` the reporter SHALL log a warning naming `ObjectMapper` as missing.
+
+### Requirement: Outbox scheduling modes and suppression
+
+The relay and cleanup scheduling SHALL each support a fixed-delay mode and a cron mode, independently for the relay and for the cleanup. The relay SHALL default to fixed-delay mode and the cleanup SHALL default to cron mode; each default SHALL apply when the corresponding `mode` property is not set. Scheduling SHALL be globally suppressible through `tx-outbox.scheduler.enabled`.
+
+#### Scenario: Relay and cleanup scheduling defaults
+
+- **WHEN** the corresponding `mode` property is not set
+- **THEN** the relay SHALL default to fixed-delay mode, the cleanup SHALL default to cron mode, and scheduling SHALL be globally suppressible through `tx-outbox.scheduler.enabled`.
+
+### Requirement: Outbox scheduler execution and relay cycle
+
+The scheduled relay and cleanup SHALL run on the dedicated `outboxTaskScheduler`, SHALL be guarded against concurrent execution by ShedLock under the lock names `outbox-relay` and `outbox-cleanup`, and SHALL be excluded under the `test` profile. Every relay cycle SHALL perform inline recovery of expired leases and release of entries whose retry time is due before claiming new entries, within the same cycle.
+
+#### Scenario: Scheduler execution and relay cycle
+
+- **WHEN** the scheduled relay and cleanup run
+- **THEN** they SHALL run on the dedicated `outboxTaskScheduler`, SHALL be guarded against concurrent execution by ShedLock under `outbox-relay` and `outbox-cleanup`, SHALL be excluded under the `test` profile, and every relay cycle SHALL perform inline recovery of expired leases and release of entries whose retry time is due before claiming new entries.
+
+### Requirement: Outbox activation decision timing
+
+The activation decision SHALL be evaluated against the bean definitions registered in the application context at bean-definition registration time, and SHALL NOT depend on the order in which auto-configurations contribute their bean definitions.
+
+#### Scenario: Activation decision timing
+
+- **WHEN** the starter evaluates activation
+- **THEN** the decision SHALL be evaluated against the bean definitions registered in the application context at bean-definition registration time and SHALL NOT depend on the order in which auto-configurations contribute their bean definitions.
+
+### Requirement: Outbox auto-configuration dependencies
+
+The starter SHALL express its dependence on the auto-configurations that provide `JdbcClient`, `ObjectMapper`, and `KafkaTemplate` through the auto-configuration `after` attribute, and SHALL NOT rely on a fixed evaluation order or on hard-coded bean names.
 
 #### Scenario: Evaluation is independent of auto-configuration ordering
 

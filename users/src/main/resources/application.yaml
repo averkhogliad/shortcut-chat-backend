@@ -2,6 +2,14 @@ spring:
   application:
     name: users-app
 
+  # The security starter is added ahead of the explicit SecurityConfig (T2); keep the existing
+  # unauthenticated API behavior until that chain is defined.
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.security.autoconfigure.web.servlet.ServletWebSecurityAutoConfiguration
+      - org.springframework.boot.security.autoconfigure.actuate.web.servlet.ManagementWebSecurityAutoConfiguration
+      - org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration
+
   datasource:
     driver-class-name: org.postgresql.Driver
     hikari:
@@ -17,6 +25,9 @@ spring:
     web:
       pageable:
         one-indexed-parameters: true
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
 
   lifecycle:
     timeout-per-shutdown-phase: 1m
@@ -29,6 +40,17 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+
+  security:
+    oauth2:
+      authorizationserver:
+        issuer: ${AUTH_SERVER_ISSUER}
+        jwk:
+          file: ${AUTH_SERVER_JWK_FILE:_etc/jwk.json}
+        client:
+          id: ${AUTH_SERVER_CLIENT_ID:shortcut-chat}
+          secret: ${AUTH_SERVER_CLIENT_SECRET}
+          redirect-uri: ${AUTH_SERVER_CLIENT_REDIRECT_URI:http://127.0.0.1:8080/login/oauth2/code/shortcut}
 
 server:
   shutdown: graceful
@@ -56,6 +78,9 @@ tx-outbox:
       channel: user-lifecycle
       event-name: UserDeleted
     - type: SendCreatedUserNotification
+      channel: mailer-commands
+      event-name: SendEmail
+    - type: SendOtpCode
       channel: mailer-commands
       event-name: SendEmail
   relay:

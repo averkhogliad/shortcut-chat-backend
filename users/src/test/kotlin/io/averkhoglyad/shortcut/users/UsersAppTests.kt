@@ -5,8 +5,10 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Import
+import org.springframework.test.context.ActiveProfiles
 
 @SpringBootTest
+@ActiveProfiles("test")
 @Import(TestcontainersConfiguration::class)
 class UsersAppTests(val ctx: ApplicationContext) : FreeSpec({
 

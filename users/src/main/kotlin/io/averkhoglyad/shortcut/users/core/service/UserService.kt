@@ -101,6 +101,10 @@ class UserServiceImpl(
         val entity = repository.findById(user.id)
             ?: return EntityResult.NotFound
 
+        if (entity.email != user.email) {
+            return EntityResult.Invalid("Email is immutable")
+        }
+
         return repository.save(user.toEntity(entity))
             .toModel()
             .also { emit(userUpdatedMessageFactory.create(it)) }
