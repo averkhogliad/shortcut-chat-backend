@@ -1,5 +1,6 @@
 package io.averkhoglyad.shortcut.message.api.controller
 
+import io.averkhoglyad.shortcut.common.security.SecurityService
 import io.averkhoglyad.shortcut.common.web.handler.unwrap
 import io.averkhoglyad.shortcut.message.api.data.SliceResponse
 import io.averkhoglyad.shortcut.message.core.model.Message
@@ -12,7 +13,8 @@ import java.util.*
 @RestController
 @RequestMapping("messages")
 class MessageController(
-    private val service: MessageService
+    private val service: MessageService,
+    private val securityService: SecurityService,
 ) {
 
     @GetMapping(params = ["!lastId"])
@@ -35,9 +37,8 @@ class MessageController(
     }
 
     @PostMapping
-    fun create(@RequestHeader("X-User-Id") userId: UUID,
-               @RequestBody message: MessageRequest): Message {
-        return service.create(message, UserRef(userId))
+    fun create(@RequestBody message: MessageRequest): Message {
+        return service.create(message, UserRef(securityService.currentUserId()))
             .unwrap()
     }
 }

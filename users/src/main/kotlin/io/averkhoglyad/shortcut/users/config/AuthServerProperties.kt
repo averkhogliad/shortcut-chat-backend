@@ -8,6 +8,7 @@ data class AuthServerProperties(
     val issuer: String,
     val jwk: Jwk,
     val client: Client,
+    val serviceClient: ServiceClient,
 ) {
 
     data class Jwk(
@@ -18,5 +19,14 @@ data class AuthServerProperties(
         val id: String,
         val secret: String,
         val redirectUri: String,
+    )
+
+    /**
+     * Confidential client used by backend services for the `client_credentials` grant.
+     * It has no user, redirect URI, or scopes: the issued token only proves the service identity.
+     */
+    data class ServiceClient(
+        val id: String,
+        val secret: String,
     )
 }

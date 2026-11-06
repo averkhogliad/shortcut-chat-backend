@@ -12,13 +12,14 @@ After `add-email-otp-auth`, the `users` service issues JWT access tokens (Bearer
 
 - All REST-facing services validate JWT via JWKs from `users` service.
 - `X-User-Id` header and `userId` query param are replaced by JWT `sub` claim.
-- `users` service enforces role-based access on its own endpoints (admin-only for POST/DELETE).
+- `users` service enforces authentication on its own endpoints; self-service operations live under `/users/me`; role-based admin restrictions are deferred to a separate change.
 
 **Non-Goals:**
 
 - API gateway (no gateway in the architecture).
 - Token refresh from client-side (clients handle refresh themselves).
-- Role-based access control in `chats` or `messages` (only `users` has admin-only endpoints).
+- Role-based access control in `chats` or `messages` (no admin-only endpoints are implemented in this cycle).
+- Role model, `roles` claim, `hasRole` policies, ADMIN bypass, and an admin panel (deferred to a separate change).
 - SSE token rotation or ticket pattern (token in query param is accepted for now).
 
 ## Decisions
@@ -54,13 +55,14 @@ Controllers extract user id from `Authentication.principal` (JWT `sub` claim). I
 ### 5. users service endpoint security
 
 SecurityConfig chain 2 (from `add-email-otp-auth`) is updated:
-- `GET /users/{id}`, `GET /users/by-email` — `authenticated()` (any valid token)
-- `POST /users` — `hasRole("ADMIN")`
-- `PUT /users/{id}` — `hasRole("ADMIN") or #id == authentication.principal.subject` (self-service)
-- `DELETE /users/{id}` — `hasRole("ADMIN")`
-- Actuator, auth endpoints — handled by chain 1 or `permitAll`
+- `GET /users/{id}`, `GET /users/by-email`, `POST /users` — `authenticated()` (interim policy; admin-only `POST /users` deferred)
+- `PUT /users/{id}`, `DELETE /users/{id}` — self only, `#id == authentication.principal.subject` via SpEL (interim policy; ADMIN-or-self deferred)
+- `/users/me` — `GET`, `PUT`, `DELETE` self-service endpoints, identity from `sub` only
+- `POST /auth/code`, `/oauth2/**`, `/.well-known/**` — `permitAll`
 
-**Why:** Users can view and edit their own profile. Admin can manage all users. Consistent with REST conventions.
+**Why:** Users can view and edit their own profile; management endpoints stay reachable for authenticated callers. Access tokens carry no `roles` claim in this cycle, so no `hasRole` policy can be applied.
+
+**Deferred (roles):** Admin-only `POST /users`, `DELETE /users/{id}`, ADMIN-or-self `PUT /users/{id}`, and the main-spec scenario "POST /users requires admin role" are deferred until a separate roles change. Current divergence: the main spec requires `403` for a non-admin `POST /users`, while the code applies `permitAll`; this change replaces `permitAll` with `authenticated()` and does not implement the `403`.
 
 ### 6. Endpoint authentication policy
 
@@ -79,7 +81,8 @@ SecurityConfig chain 2 (from `add-email-otp-auth`) is updated:
 - [Token in SSE URL] → Access token exposed in logs. Mitigation: short TTL (15 min). Ticket pattern is a future enhancement.
 - [JWKs fetch failure] → If `users` service is down, other services cannot validate tokens and reject all requests. Mitigation: JWKs are cached by Spring Security with periodic refresh. Accepted.
 - [Breaking change for existing clients] → All clients must send Bearer token instead of X-User-Id. Mitigation: clients update after auth is deployed. No backward-compatible transition period.
-- [Existing tests break] → All endpoint tests that send `X-User-Id` header need to send mock JWT instead. Mitigation: use `@WithMockUser` or `SecurityMockMvcRequestPostProcessors.jwt()` for test auth.
+- [Existing tests break] → All endpoint tests that send `X-User-Id` header need to send mock JWT instead. Mitigation: use `SecurityMockMvcRequestPostProcessors.jwt()` (MVC) or the reactive equivalent for test auth.
+- [Spec-code divergence on admin POST /users] → The main spec still states `403` for a non-admin `POST /users`; code applies `permitAll` and the role model is deferred. Mitigation: the delta marks the scenario deferred; the sync to main specs (separate task) carries the annotated formulation. The interim behaviour is `authenticated()`, not `403`.
 
 ## Open Questions
 

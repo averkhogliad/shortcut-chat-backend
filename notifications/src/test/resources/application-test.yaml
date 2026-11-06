@@ -1,0 +1,11 @@
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          users-service:
+            client-id: test-service-client
+            client-secret: test-service-client-secret
+        provider:
+          users:
+            token-uri: http://localhost:8080/oauth2/token

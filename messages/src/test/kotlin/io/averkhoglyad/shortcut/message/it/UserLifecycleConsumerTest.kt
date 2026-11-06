@@ -1,5 +1,6 @@
 package io.averkhoglyad.shortcut.message.it
 
+import io.averkhoglyad.shortcut.message.TestSecurityConfiguration
 import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.message.core.model.UserCreatedPayload
 import io.averkhoglyad.shortcut.message.core.model.UserDeletedPayload
@@ -26,7 +27,7 @@ private const val TOPIC = "UserLifecycle"
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration::class)
+@Import(TestcontainersConfiguration::class, TestSecurityConfiguration::class)
 class UserLifecycleConsumerTest(
     jdbc: JdbcClient,
     kafkaProducer: KafkaProducer<String, Any>,

@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.security.core.context.ReactiveSecurityContextHolder
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.server.ServerRequest
 import org.springframework.web.reactive.function.server.ServerResponse
-import org.springframework.web.reactive.function.server.queryParamOrNull
 import reactor.core.publisher.Mono
 import java.util.*
 import kotlin.coroutines.cancellation.CancellationException
@@ -27,11 +29,12 @@ class NotificationSubscriptionHandler(
 
     private val log by slf4j()
 
-    fun subscribe(req: ServerRequest): Mono<ServerResponse> {
-        val userId = req.queryParamOrNull("userId")
-            ?.let { UUID.fromString(it) }
-            ?: throw IllegalArgumentException("User ID header must be passed")
+    fun subscribe(req: ServerRequest): Mono<ServerResponse> =
+        currentUserId()
+            .flatMap(::subscribeTo)
+            .switchIfEmpty(ServerResponse.status(HttpStatus.UNAUTHORIZED).build())
 
+    private fun subscribeTo(userId: UUID): Mono<ServerResponse> {
         val events = service.events()
             .map { events -> EventsResponse(events.visibleTo(userId)) }
             .onStart { log.info("started") }
@@ -46,6 +49,19 @@ class NotificationSubscriptionHandler(
             .contentType(MediaType.TEXT_EVENT_STREAM)
             .body(events, EventsResponse::class.java)
     }
+
+    private fun currentUserId(): Mono<UUID> =
+        ReactiveSecurityContextHolder.getContext()
+            .flatMap { context ->
+                when (val authentication = context.authentication) {
+                    is JwtAuthenticationToken -> Mono.justOrEmpty(authentication.token.subject)
+                    else -> Mono.empty<String>()
+                }
+            }
+            .flatMap { subject ->
+                Mono.fromCallable { UUID.fromString(subject) }
+                    .onErrorResume(IllegalArgumentException::class.java) { Mono.empty<UUID>() }
+            }
 }
 
 

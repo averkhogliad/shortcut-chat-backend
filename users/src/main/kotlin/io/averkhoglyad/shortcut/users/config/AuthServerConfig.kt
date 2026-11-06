@@ -69,7 +69,13 @@ class AuthServerConfig {
                     .build()
             )
             .build()
-        return InMemoryRegisteredClientRepository(client)
+        val serviceClient = RegisteredClient.withId(UUID.randomUUID().toString())
+            .clientId(properties.serviceClient.id)
+            .clientSecret(requireNotNull(passwordEncoder.encode(properties.serviceClient.secret)))
+            .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            .authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+            .build()
+        return InMemoryRegisteredClientRepository(client, serviceClient)
     }
 
     /**

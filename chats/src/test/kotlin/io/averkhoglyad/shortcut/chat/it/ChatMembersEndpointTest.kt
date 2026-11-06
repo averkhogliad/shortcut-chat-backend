@@ -11,9 +11,12 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.util.UUID
 
 private const val INIT = "/it/members/init.sql"
 private const val CLEAR = "/it/members/clear.sql"
+
+private val CALLER = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -30,7 +33,7 @@ class ChatMembersEndpointTest(
         "returns active members for single chat by default" {
             val chatId = "00000000-0000-0000-0000-000000000001"
 
-            mvc.perform(get("/members").queryParam("chatId", chatId))
+            mvc.perform(get("/members").with(jwtFor(CALLER)).queryParam("chatId", chatId))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].id").value(chatId))
@@ -43,7 +46,7 @@ class ChatMembersEndpointTest(
             val chatId1 = "00000000-0000-0000-0000-000000000001"
             val chatId2 = "00000000-0000-0000-0000-000000000002"
 
-            mvc.perform(get("/members").queryParam("chatId", chatId1, chatId2))
+            mvc.perform(get("/members").with(jwtFor(CALLER)).queryParam("chatId", chatId1, chatId2))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].id").value(chatId1))
@@ -55,7 +58,11 @@ class ChatMembersEndpointTest(
         "excludes deleted members when includeDeleted is false" {
             val chatId = "00000000-0000-0000-0000-000000000001"
 
-            mvc.perform(get("/members").queryParam("chatId", chatId).queryParam("includeDeleted", "false"))
+            mvc.perform(
+                get("/members").with(jwtFor(CALLER))
+                    .queryParam("chatId", chatId)
+                    .queryParam("includeDeleted", "false")
+            )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].members.length()").value(2))
@@ -66,7 +73,11 @@ class ChatMembersEndpointTest(
         "includes deleted members when includeDeleted is true" {
             val chatId = "00000000-0000-0000-0000-000000000001"
 
-            mvc.perform(get("/members").queryParam("chatId", chatId).queryParam("includeDeleted", "true"))
+            mvc.perform(
+                get("/members").with(jwtFor(CALLER))
+                    .queryParam("chatId", chatId)
+                    .queryParam("includeDeleted", "true")
+            )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].members.length()").value(3))
@@ -80,7 +91,7 @@ class ChatMembersEndpointTest(
             val chatId2 = "00000000-0000-0000-0000-000000000002"
 
             mvc.perform(
-                get("/members")
+                get("/members").with(jwtFor(CALLER))
                     .queryParam("chatId", chatId1, chatId2)
                     .queryParam("includeDeleted", "true")
             )
@@ -94,7 +105,7 @@ class ChatMembersEndpointTest(
         "returns empty collection for non-existent chat" {
             val nonExistentChatId = "00000000-0000-0000-0000-000000000999"
 
-            mvc.perform(get("/members").queryParam("chatId", nonExistentChatId))
+            mvc.perform(get("/members").with(jwtFor(CALLER)).queryParam("chatId", nonExistentChatId))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(0))
         }
@@ -102,19 +113,23 @@ class ChatMembersEndpointTest(
         "returns empty collection for non-existent chat when includeDeleted is true" {
             val nonExistentChatId = "00000000-0000-0000-0000-000000000999"
 
-            mvc.perform(get("/members").queryParam("chatId", nonExistentChatId).queryParam("includeDeleted", "true"))
+            mvc.perform(
+                get("/members").with(jwtFor(CALLER))
+                    .queryParam("chatId", nonExistentChatId)
+                    .queryParam("includeDeleted", "true")
+            )
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(0))
         }
 
         "returns empty collection when no chatIds provided" {
-            mvc.perform(get("/members"))
+            mvc.perform(get("/members").with(jwtFor(CALLER)))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.length()").value(0))
         }
 
         "returns 400 for invalid chatId format" {
-            mvc.perform(get("/members").queryParam("chatId", "invalid-uuid"))
+            mvc.perform(get("/members").with(jwtFor(CALLER)).queryParam("chatId", "invalid-uuid"))
                 .andExpect(status().isBadRequest)
         }
     }

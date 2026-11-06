@@ -292,7 +292,13 @@ class EmailOtpFlowTest(
             val email = newEmail()
             requestCode(email)
             val code = redis.otpCode(email).shouldNotBeNull()
-            tokenRequest(email, code).andExpect(status().isOk)
+            val accessToken = tokenRequest(email, code)
+                .andExpect(status().isOk)
+                .andReturn()
+                .response
+                .contentAsString
+                .let(mapper::readTree)["access_token"]
+                .stringValue()
             val stored = jdbc.findUserByEmail(email).shouldNotBeNull()
             val userId = UUID.fromString(stored["id"].toString())
             val request = User(
@@ -304,6 +310,7 @@ class EmailOtpFlowTest(
             // when
             mvc.perform(
                 put("/users/$userId")
+                    .header(AUTHORIZATION, "Bearer $accessToken")
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )

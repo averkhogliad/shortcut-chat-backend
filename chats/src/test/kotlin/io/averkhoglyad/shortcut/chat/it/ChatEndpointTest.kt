@@ -33,6 +33,8 @@ import kotlin.reflect.KClass
 private const val INIT = "/it/chat/init.sql"
 private const val CLEAR = "/it/chat/clear.sql"
 
+private val USER_ONE = UUID.fromString("00000000-0000-0000-0000-000000000001")
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -54,7 +56,7 @@ class ChatEndpointTest(
             // when
             val response = mvc.perform(
                 get("/chats")
-                    .header("X-User-Id", userId.toString())
+                    .with(jwtFor(userId))
                     .queryParam("pageSize", "2"))
 
             // then
@@ -63,6 +65,11 @@ class ChatEndpointTest(
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value("00000000-0000-0000-0000-000000000001"))
                 .andExpect(jsonPath("$.data[0].name").value("First Chat"))
+                .andExpect(jsonPath("$.data[0].owner.id").value(userId.toString()))
+                .andExpect(jsonPath("$.data[0].owner.email").value("user1@example.com"))
+                .andExpect(jsonPath("$.data[0].owner.deleted").value(false))
+                .andExpect(jsonPath("$.data[1].id").value("00000000-0000-0000-0000-000000000003"))
+                .andExpect(jsonPath("$.data[1].owner.id").value(userId.toString()))
                 .andExpect(jsonPath("$.next").exists())
         }
 
@@ -73,7 +80,7 @@ class ChatEndpointTest(
 
             // when
             mvc.perform(get("/chats")
-                    .header("X-User-Id", userId)
+                    .with(jwtFor(userId))
                     .queryParam("pageSize", "2")
                     .queryParam("lastId", lastId.toString()))
                 .andExpect(status().isOk)
@@ -88,10 +95,13 @@ class ChatEndpointTest(
             val chatId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
             // when
-            mvc.perform(get("/chats/$chatId"))
+            mvc.perform(get("/chats/$chatId").with(jwtFor(USER_ONE)))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.id").value(chatId.toString()))
                 .andExpect(jsonPath("$.name").value("First Chat"))
+                .andExpect(jsonPath("$.owner.id").value(USER_ONE.toString()))
+                .andExpect(jsonPath("$.owner.name").value("User One"))
+                .andExpect(jsonPath("$.owner.email").value("user1@example.com"))
                 .andExpect(jsonPath("$.members.length()").value(2))
         }
 
@@ -100,7 +110,7 @@ class ChatEndpointTest(
             val chatId = UUID.fromString("00000000-0000-0000-0000-000000000999")
 
             // when
-            mvc.perform(get("/chats/$chatId"))
+            mvc.perform(get("/chats/$chatId").with(jwtFor(USER_ONE)))
                 .andExpect(status().isNotFound)
         }
 
@@ -111,7 +121,7 @@ class ChatEndpointTest(
             val activeUserId = UUID.fromString("00000000-0000-0000-0000-000000000002")
 
             // when
-            val result = mvc.perform(get("/chats/$chatId"))
+            val result = mvc.perform(get("/chats/$chatId").with(jwtFor(USER_ONE)))
                 .andExpect(status().isOk)
                 .andReturn()
 
@@ -140,10 +150,12 @@ class ChatEndpointTest(
 
             // when
             val result = mvc.perform(post("/chats")
+                    .with(jwtFor(USER_ONE))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request)))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.name").value("New Chat"))
+                .andExpect(jsonPath("$.owner.id").value(USER_ONE.toString()))
                 .andExpect(jsonPath("$.members.length()").value(2))
                 .andReturn()
 
@@ -154,6 +166,7 @@ class ChatEndpointTest(
             withClue("Chat row") {
                 chatRow shouldNotBeNull {
                     this shouldContain ("name" to request.name)
+                    this shouldContain ("owner_id" to USER_ONE)
                     this.shouldContainKeys("created_at")
                 }
             }
@@ -187,6 +200,7 @@ class ChatEndpointTest(
 
             // when
             val response = mvc.perform(post("/chats")
+                    .with(jwtFor(USER_ONE))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request)))
 

@@ -19,6 +19,23 @@ spring:
     problemdetails:
       enabled: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVER_ISSUER}
+      client:
+        registration:
+          users-service:
+            provider: users
+            client-id: ${NOTIFICATIONS_SERVICE_CLIENT_ID}
+            client-secret: ${NOTIFICATIONS_SERVICE_CLIENT_SECRET}
+            authorization-grant-type: client_credentials
+            client-authentication-method: client_secret_basic
+        provider:
+          users:
+            token-uri: ${AUTH_SERVER_ISSUER}/oauth2/token
+
 server:
   shutdown: graceful
 

@@ -21,6 +21,12 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 1m
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVER_ISSUER}
+
   kafka:
     bootstrap-servers: localhost:9092
     consumer:

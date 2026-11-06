@@ -2,6 +2,7 @@ package io.averkhoglyad.shortcut.message.it
 
 import io.averkhoglyad.shortcut.common.test.asInstantColumn
 import io.averkhoglyad.shortcut.common.test.executeSql
+import io.averkhoglyad.shortcut.message.TestSecurityConfiguration
 import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.message.core.service.chatCreatedPayloads
 import io.kotest.assertions.nondeterministic.eventually
@@ -27,7 +28,7 @@ private const val CLEAR = "/it/chat-lifecycle/clear.sql"
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration::class)
+@Import(TestcontainersConfiguration::class, TestSecurityConfiguration::class)
 class ChatLifecycleConsumerTest(
     jdbc: JdbcClient,
     kafkaProducer: KafkaProducer<String, Any>,

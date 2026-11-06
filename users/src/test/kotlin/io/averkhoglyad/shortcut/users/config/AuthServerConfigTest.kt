@@ -8,6 +8,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.oauth2.core.AuthorizationGrantType
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod
 import org.springframework.security.oauth2.core.oidc.OidcScopes
 import java.nio.file.Path
 import java.time.Duration
@@ -23,6 +24,10 @@ class AuthServerConfigTest : FreeSpec({
             id = "test-client",
             secret = "test-secret",
             redirectUri = "http://localhost/callback",
+        ),
+        serviceClient = AuthServerProperties.ServiceClient(
+            id = "test-service-client",
+            secret = "test-service-client-secret",
         ),
     )
 
@@ -63,6 +68,30 @@ class AuthServerConfigTest : FreeSpec({
             // then
             client.clientSecret shouldNotBe "test-secret"
             passwordEncoder.matches("test-secret", client.clientSecret) shouldBe true
+        }
+
+        "registers the service client with client_credentials and client_secret_basic" {
+            // when
+            val client = config.registeredClientRepository(properties, passwordEncoder)
+                .findByClientId("test-service-client")
+                .shouldNotBeNull()
+
+            // then
+            client.authorizationGrantTypes shouldBe setOf(AuthorizationGrantType.CLIENT_CREDENTIALS)
+            client.clientAuthenticationMethods shouldBe setOf(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+            client.redirectUris shouldBe emptySet()
+            client.scopes shouldBe emptySet()
+        }
+
+        "stores the service client secret encoded" {
+            // when
+            val client = config.registeredClientRepository(properties, passwordEncoder)
+                .findByClientId("test-service-client")
+                .shouldNotBeNull()
+
+            // then
+            client.clientSecret shouldNotBe "test-service-client-secret"
+            passwordEncoder.matches("test-service-client-secret", client.clientSecret) shouldBe true
         }
     }
 })

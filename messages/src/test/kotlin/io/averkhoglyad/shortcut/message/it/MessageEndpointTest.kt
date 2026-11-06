@@ -3,6 +3,7 @@ package io.averkhoglyad.shortcut.message.it
 import tools.jackson.databind.ObjectMapper
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.averkhoglyad.shortcut.common.util.toUUID
+import io.averkhoglyad.shortcut.message.TestSecurityConfiguration
 import io.averkhoglyad.shortcut.message.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.message.core.model.ChatRef
 import io.averkhoglyad.shortcut.message.core.model.Message
@@ -29,6 +30,7 @@ import org.springframework.http.MediaType.APPLICATION_JSON
 import org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON
 import org.springframework.jdbc.core.simple.JdbcClient
 import org.springframework.kafka.test.utils.KafkaTestUtils
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.RequestBuilder
@@ -48,7 +50,7 @@ private const val CLEAR = "/it/clear.sql"
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Import(TestcontainersConfiguration::class)
+@Import(TestcontainersConfiguration::class, TestSecurityConfiguration::class)
 class MessageEndpointTest(
     val mvc: MockMvc,
     val jdbc: JdbcClient,
@@ -71,6 +73,7 @@ class MessageEndpointTest(
                     .queryParam("chat", chatId)
                     .queryParam("pageSize", "1")
                     .accept(APPLICATION_JSON)
+                    .with(jwt())
                     .perform()
 
                 // then
@@ -93,6 +96,7 @@ class MessageEndpointTest(
                     .queryParam("pageSize", "1")
                     .queryParam("lastId", lastId)
                     .accept(APPLICATION_JSON)
+                    .with(jwt())
                     .perform()
 
                 // then
@@ -115,6 +119,7 @@ class MessageEndpointTest(
                     .queryParam("pageSize", "1")
                     .queryParam("lastId", lastId)
                     .accept(APPLICATION_JSON)
+                    .with(jwt())
                     .perform()
 
                 // then
@@ -130,6 +135,7 @@ class MessageEndpointTest(
                     get("/messages")
                         .queryParam("chat", "invalid-uuid")
                         .queryParam("pageSize", "1")
+                        .with(jwt())
                 )
                     .andExpect(status().isBadRequest)
                     .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
@@ -145,6 +151,7 @@ class MessageEndpointTest(
                         .queryParam("chat", chatId)
                         .queryParam("pageSize", "1")
                         .queryParam("lastId", "invalid-uuid")
+                        .with(jwt())
                 )
                     .andExpect(status().isBadRequest)
                     .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
@@ -164,7 +171,7 @@ class MessageEndpointTest(
 
                 // when
                 val response = post("/messages")
-                    .header("X-User-Id", userId)
+                    .with(jwtFor(userId.toUUID()))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsString(request))
                     .perform()
@@ -205,11 +212,11 @@ class MessageEndpointTest(
 
             }
 
-            "returns 400 for invalid user id header" {
+            "returns 400 for a subject that is not a UUID" {
                 // when
                 mvc.perform(
                     post("/messages")
-                        .header("X-User-Id", "invalid-uuid")
+                        .with(jwt().jwt { it.subject("not-a-uuid") })
                         .contentType(APPLICATION_JSON)
                         .content("""{"text":"text","chat":{"id":"22222222-2222-2222-2222-222222222222"}}""")
                 )
@@ -217,22 +224,21 @@ class MessageEndpointTest(
                     .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
             }
 
-            "returns 400 for missing user id header" {
+            "returns 401 without a token" {
                 // when
                 mvc.perform(
                     post("/messages")
                         .contentType(APPLICATION_JSON)
                         .content("""{"text":"text","chat":{"id":"22222222-2222-2222-2222-222222222222"}}""")
                 )
-                    .andExpect(status().is4xxClientError)
-                    .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+                    .andExpect(status().isUnauthorized)
             }
 
             "returns 400 for invalid chat id in body" {
                 // when
                 mvc.perform(
                     post("/messages")
-                        .header("X-User-Id", "11111111-1111-1111-1111-111111111111")
+                        .with(jwt())
                         .contentType(APPLICATION_JSON)
                         .content("""{"text":"text","chat":{"id":"invalid-uuid"}}""")
                 )
@@ -258,7 +264,7 @@ class MessageEndpointTest(
 
                 // when
                 val response = post("/messages")
-                    .header("X-User-Id", userId)
+                    .with(jwtFor(userId.toUUID()))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsString(request))
                     .perform()
@@ -278,6 +284,8 @@ class MessageEndpointTest(
 
     private fun RequestBuilder.perform() = mvc.perform(this)
 }
+
+private fun jwtFor(userId: UUID) = jwt().jwt { it.subject(userId.toString()) }
 
 private fun JdbcClient.loadMessageRow(id: UUID): Map<String, Any?>? {
     return this.sql("select * from messages where id=:id")

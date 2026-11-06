@@ -46,7 +46,7 @@ class UserEndpointTest(
             val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
             // when
-            mvc.perform(get("/users/$userId"))
+            mvc.perform(get("/users/$userId").with(jwtFor(userId)))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.id").value(userId.toString()))
                 .andExpect(jsonPath("$.name").value("User One"))
@@ -58,16 +58,28 @@ class UserEndpointTest(
             val userId = UUID.fromString("00000000-0000-0000-0000-000000000999")
 
             // when
-            mvc.perform(get("/users/$userId"))
+            mvc.perform(get("/users/$userId").with(jwtFor(userId)))
                 .andExpect(status().isNotFound)
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+        }
+
+        "returns 401 without a token" {
+            // given
+            val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+
+            // when/then
+            mvc.perform(get("/users/$userId"))
+                .andExpect(status().isUnauthorized)
         }
     }
 
     "GET /users/by-email" - {
         "returns existing user" {
+            // given
+            val userId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+
             // when
-            mvc.perform(get("/users/by-email").queryParam("email", "user2@example.com"))
+            mvc.perform(get("/users/by-email").queryParam("email", "user2@example.com").with(jwtFor(userId)))
                 .andExpect(status().isOk)
                 .andExpect(jsonPath("$.id").value("00000000-0000-0000-0000-000000000002"))
                 .andExpect(jsonPath("$.name").value("User Two"))
@@ -75,9 +87,15 @@ class UserEndpointTest(
 
         "returns ProblemDetail for missing user" {
             // when
-            mvc.perform(get("/users/by-email").queryParam("email", "missing@example.com"))
+            mvc.perform(get("/users/by-email").queryParam("email", "missing@example.com").with(jwtFor(UUID.randomUUID())))
                 .andExpect(status().isNotFound)
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+        }
+
+        "returns 401 without a token" {
+            // when/then
+            mvc.perform(get("/users/by-email").queryParam("email", "user2@example.com"))
+                .andExpect(status().isUnauthorized)
         }
     }
 
@@ -90,6 +108,7 @@ class UserEndpointTest(
             // when
             val response = mvc.perform(
                 post("/users")
+                    .with(jwtFor(UUID.randomUUID()))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )
@@ -103,15 +122,15 @@ class UserEndpointTest(
             val created = mapper.readValue(response.response.contentAsString, User::class.java)
             created.id.shouldNotBeNull()
 
-            jdbc.loadUserRow(requireNotNull(created.id)).shouldNotBeNull {
+            jdbc.findUserRow(requireNotNull(created.id)).shouldNotBeNull {
                 this["name"] shouldBe "New User"
                 this["email"] shouldBe email
             }
-            jdbc.countOutbox() shouldBe 2L
-            jdbc.findOutboxByEventName("UserCreated").shouldNotBeNull {
+            jdbc.countOutboxRecords() shouldBe 2L
+            jdbc.findOutboxRecordByEventName("UserCreated").shouldNotBeNull {
                 this["key"] shouldBe requireNotNull(created.id).toString()
             }
-            jdbc.findOutboxByEventName("SendEmail").shouldNotBeNull {
+            jdbc.findOutboxRecordByEventName("SendEmail").shouldNotBeNull {
                 this["key"] shouldBe null
             }
         }
@@ -123,6 +142,7 @@ class UserEndpointTest(
             // when
             mvc.perform(
                 post("/users")
+                    .with(jwtFor(UUID.randomUUID()))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )
@@ -134,11 +154,27 @@ class UserEndpointTest(
             // when
             mvc.perform(
                 post("/users")
+                    .with(jwtFor(UUID.randomUUID()))
                     .contentType(APPLICATION_JSON)
                     .content("""{"email":"new@example.com"}""")
             )
                 .andExpect(status().isBadRequest)
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+        }
+
+        "returns 401 without a token" {
+            // given
+            val request = User(id = null, name = "New User", email = "new@example.com")
+
+            // when/then
+            mvc.perform(
+                post("/users")
+                    .contentType(APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(request))
+            )
+                .andExpect(status().isUnauthorized)
+
+            jdbc.countOutboxRecords() shouldBe 0L
         }
     }
 
@@ -151,6 +187,7 @@ class UserEndpointTest(
             // when
             mvc.perform(
                 put("/users/$userId")
+                    .with(jwtFor(userId))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )
@@ -160,12 +197,12 @@ class UserEndpointTest(
                 .andExpect(jsonPath("$.email").value("user1@example.com"))
 
             // then
-            jdbc.loadUserRow(userId).shouldNotBeNull {
+            jdbc.findUserRow(userId).shouldNotBeNull {
                 this["name"] shouldBe "Updated User"
                 this["email"] shouldBe "user1@example.com"
             }
-            jdbc.countOutbox() shouldBe 1L
-            jdbc.findOutboxByEventName("UserUpdated").shouldNotBeNull {
+            jdbc.countOutboxRecords() shouldBe 1L
+            jdbc.findOutboxRecordByEventName("UserUpdated").shouldNotBeNull {
                 this["topic"] shouldBe "UserLifecycle"
                 this["key"] shouldBe userId.toString()
             }
@@ -179,6 +216,7 @@ class UserEndpointTest(
             // when
             mvc.perform(
                 put("/users/$userId")
+                    .with(jwtFor(userId))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )
@@ -186,11 +224,11 @@ class UserEndpointTest(
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
 
             // then
-            jdbc.loadUserRow(userId).shouldNotBeNull {
+            jdbc.findUserRow(userId).shouldNotBeNull {
                 this["name"] shouldBe "User One"
                 this["email"] shouldBe "user1@example.com"
             }
-            jdbc.countOutbox() shouldBe 0L
+            jdbc.countOutboxRecords() shouldBe 0L
         }
 
         "returns 400 when body id differs from path id" {
@@ -201,6 +239,7 @@ class UserEndpointTest(
             // when
             mvc.perform(
                 put("/users/$userId")
+                    .with(jwtFor(userId))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )
@@ -216,11 +255,52 @@ class UserEndpointTest(
             // when
             mvc.perform(
                 put("/users/$userId")
+                    .with(jwtFor(userId))
                     .contentType(APPLICATION_JSON)
                     .content(mapper.writeValueAsBytes(request))
             )
                 .andExpect(status().isNotFound)
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+        }
+
+        "returns 403 and leaves the user unchanged when the path id is another user" {
+            // given
+            val callerId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+            val otherId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+            val request = User(id = null, name = "Hijacked User", email = "user2@example.com")
+
+            // when
+            mvc.perform(
+                put("/users/$otherId")
+                    .with(jwtFor(callerId))
+                    .contentType(APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(request))
+            )
+                .andExpect(status().isForbidden)
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+
+            // then
+            jdbc.findUserRow(otherId).shouldNotBeNull {
+                this["name"] shouldBe "User Two"
+                this["email"] shouldBe "user2@example.com"
+            }
+            jdbc.countOutboxRecords() shouldBe 0L
+        }
+
+        "returns 401 without a token" {
+            // given
+            val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+            val request = User(id = null, name = "Updated User", email = "user1@example.com")
+
+            // when/then
+            mvc.perform(
+                put("/users/$userId")
+                    .contentType(APPLICATION_JSON)
+                    .content(mapper.writeValueAsBytes(request))
+            )
+                .andExpect(status().isUnauthorized)
+
+            jdbc.countOutboxRecords() shouldBe 0L
         }
     }
 
@@ -230,13 +310,13 @@ class UserEndpointTest(
             val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
 
             // when
-            mvc.perform(delete("/users/$userId"))
+            mvc.perform(delete("/users/$userId").with(jwtFor(userId)))
                 .andExpect(status().isNoContent)
 
             // then
-            jdbc.findUser(userId) shouldBe null
-            jdbc.countOutbox() shouldBe 1L
-            val outbox = jdbc.findOutboxByEventName("UserDeleted").shouldNotBeNull()
+            jdbc.findUserRow(userId) shouldBe null
+            jdbc.countOutboxRecords() shouldBe 1L
+            val outbox = jdbc.findOutboxRecordByEventName("UserDeleted").shouldNotBeNull()
             outbox["topic"] shouldBe "UserLifecycle"
             outbox["key"] shouldBe userId.toString()
             val bodyNode = mapper.readTree(outbox["body"].toString())
@@ -248,38 +328,42 @@ class UserEndpointTest(
             val userId = UUID.fromString("00000000-0000-0000-0000-000000000999")
 
             // when
-            mvc.perform(delete("/users/$userId"))
+            mvc.perform(delete("/users/$userId").with(jwtFor(userId)))
                 .andExpect(status().isNotFound)
                 .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
 
             // then
-            jdbc.countOutbox() shouldBe 0L
+            jdbc.countOutboxRecords() shouldBe 0L
+        }
+
+        "returns 403 and keeps the user when the path id is another user" {
+            // given
+            val callerId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+            val otherId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+
+            // when
+            mvc.perform(delete("/users/$otherId").with(jwtFor(callerId)))
+                .andExpect(status().isForbidden)
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_PROBLEM_JSON))
+
+            // then
+            jdbc.findUserRow(otherId).shouldNotBeNull {
+                this["name"] shouldBe "User Two"
+            }
+            jdbc.countOutboxRecords() shouldBe 0L
+        }
+
+        "returns 401 without a token" {
+            // given
+            val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
+
+            // when/then
+            mvc.perform(delete("/users/$userId"))
+                .andExpect(status().isUnauthorized)
+
+            jdbc.findUserRow(userId).shouldNotBeNull()
+            jdbc.countOutboxRecords() shouldBe 0L
         }
     }
 })
 
-private fun JdbcClient.loadUserRow(id: UUID): Map<String, Any?>? =
-    this.sql("select * from users where id=:id")
-        .param("id", id)
-        .query()
-        .listOfRows()
-        .firstOrNull()
-
-private fun JdbcClient.findUser(id: UUID): Map<String, Any?>? =
-    this.sql("select * from users where id=:id")
-        .param("id", id)
-        .query()
-        .listOfRows()
-        .firstOrNull()
-
-private fun JdbcClient.countOutbox(): Long =
-    this.sql("select count(*) from message_outbox")
-        .query(Long::class.java)
-        .single()
-
-private fun JdbcClient.findOutboxByEventName(eventName: String): Map<String, Any?>? =
-    this.sql("select * from message_outbox where headers->>'X-Event-Name' = :eventName")
-        .param("eventName", eventName)
-        .query()
-        .listOfRows()
-        .firstOrNull()

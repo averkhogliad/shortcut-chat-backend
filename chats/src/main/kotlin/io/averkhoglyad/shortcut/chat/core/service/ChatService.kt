@@ -22,7 +22,7 @@ interface ChatService {
 
     fun findById(chatId: UUID): EntityResult<ChatDetails>
 
-    fun create(chat: ChatRequest): EntityResult<ChatDetails>
+    fun create(chat: ChatRequest, ownerId: UUID): EntityResult<ChatDetails>
 
     fun findMembersByIds(chatIds: Collection<UUID>, includeDeleted: Boolean = false): List<ChatMembers>
 }
@@ -38,32 +38,29 @@ class ChatServiceImpl(
 
     override fun listForUser(userId: UUID, pageSize: Int): List<ChatListItem> {
         return repository.findByMembersContainsOrderById(userId, Pageable.ofSize(pageSize))
-            .map { it.toListItem() }
+            .toListItems()
     }
 
     override fun listForUser(userId: UUID, afterId: UUID, pageSize: Int): List<ChatListItem> {
         return repository.findByMembersContainsAndIdGreaterThanOrderById(userId, afterId, Pageable.ofSize(pageSize))
-            .map { it.toListItem() }
+            .toListItems()
     }
 
     override fun findById(chatId: UUID): EntityResult<ChatDetails> {
-        return repository.findById(chatId)
-            ?.let { it to userRepository.findByIdIsIn(it.memberIds) }
-            ?.let { (entity, members) -> entity.toDetails(members) }
-            ?.let { EntityResult.Success(it) }
-            ?: EntityResult.NotFound
+        val entity = repository.findById(chatId)
+            ?: return EntityResult.NotFound
+        return EntityResult.Success(entity.toDetails(loadUsers(entity.userIds)))
     }
 
     @Transactional
-    override fun create(chat: ChatRequest): EntityResult<ChatDetails> {
+    override fun create(chat: ChatRequest, ownerId: UUID): EntityResult<ChatDetails> {
         if (hasDeletedMembers(chat)) {
             return EntityResult.Invalid("members reference deleted users")
         }
-        return repository.save(chat.toEntity())
-            .let { it to userRepository.findByIdIsIn(it.memberIds) }
-            .let { (entity, members) -> entity.toDetails(members) }
-            .also { emitChatCreatedLifecycleEvent(it) }
-            .let { EntityResult.Success(it) }
+        val details = repository.save(chat.toEntity(ownerId))
+            .let { it.toDetails(loadUsers(it.userIds)) }
+        emitChatCreatedLifecycleEvent(details)
+        return EntityResult.Success(details)
     }
 
     override fun findMembersByIds(chatIds: Collection<UUID>, includeDeleted: Boolean): List<ChatMembers> {
@@ -101,13 +98,23 @@ class ChatServiceImpl(
             .any { it.deleted }
     }
 
-    private fun ChatRequest.toEntity(): ChatEntity = converter.toEntity(this)
+    private fun ChatRequest.toEntity(ownerId: UUID): ChatEntity = converter.toEntity(this, ownerId)
 
-    private fun ChatEntity.toDetails(memberUsers: Collection<UserEntity>): ChatDetails =
-        converter.toDetails(this, memberUsers)
+    private fun ChatEntity.toDetails(users: Collection<UserEntity>): ChatDetails =
+        converter.toDetails(this, users)
 
-    private fun ChatEntity.toListItem(): ChatListItem = converter.toListItem(this)
+    private fun List<ChatEntity>.toListItems(): List<ChatListItem> =
+        ownerUsers().let { users -> map { converter.toListItem(it, users) } }
+
+    private fun List<ChatEntity>.ownerUsers(): Collection<UserEntity> =
+        loadUsers(mapNotNull { it.owner?.id }.distinct())
+
+    private fun loadUsers(ids: Collection<UUID>): Collection<UserEntity> =
+        if (ids.isEmpty()) emptyList() else userRepository.findByIdIsIn(ids)
 }
 
 private val ChatEntity.memberIds: Collection<UUID>
     get() = members.mapNotNull { it.user.id }
+
+private val ChatEntity.userIds: Collection<UUID>
+    get() = (memberIds + listOfNotNull(owner?.id)).distinct()

@@ -36,6 +36,12 @@ spring:
     problemdetails:
       enabled: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AUTH_SERVER_ISSUER}
+
 server:
   shutdown: graceful
 

@@ -14,13 +14,13 @@ import java.util.*
 
 interface ChatConverter {
 
-    fun toEntity(chat: ChatRequest): ChatEntity
+    fun toEntity(chat: ChatRequest, ownerId: UUID): ChatEntity
 
     fun toEntity(chat: ChatRequest, entity: ChatEntity): ChatEntity
 
-    fun toDetails(entity: ChatEntity, memberUsers: Collection<UserEntity>): ChatDetails
+    fun toDetails(entity: ChatEntity, users: Collection<UserEntity>): ChatDetails
 
-    fun toListItem(entity: ChatEntity): ChatListItem
+    fun toListItem(entity: ChatEntity, users: Collection<UserEntity>): ChatListItem
 
 }
 
@@ -29,8 +29,9 @@ class ChatConverterImpl(
     private val userConverter: UserConverter,
 ) : ChatConverter {
 
-    override fun toEntity(chat: ChatRequest): ChatEntity {
+    override fun toEntity(chat: ChatRequest, ownerId: UUID): ChatEntity {
         return toEntity(chat, ChatEntity())
+            .apply { this.owner = ownerId.asRef() }
     }
 
     override fun toEntity(chat: ChatRequest, entity: ChatEntity): ChatEntity {
@@ -41,25 +42,29 @@ class ChatConverterImpl(
             }
     }
 
-    override fun toListItem(entity: ChatEntity): ChatListItem {
+    override fun toListItem(entity: ChatEntity, users: Collection<UserEntity>): ChatListItem {
         return ChatListItem(
             id = requireNotNull(entity.id),
             name = entity.name,
-            owner = null, // TODO:
+            owner = entity.ownerUser(users)?.let(userConverter::toDetails),
             createdAt = entity.createdAt,
         )
     }
 
-    override fun toDetails(entity: ChatEntity, memberUsers: Collection<UserEntity>): ChatDetails {
+    override fun toDetails(entity: ChatEntity, users: Collection<UserEntity>): ChatDetails {
         return ChatDetails(
             id = requireNotNull(entity.id),
             name = entity.name,
-            owner = entity.owner?.id?.let{ oid -> userConverter.toDetails(memberUsers.first { it.id == oid }) },
-            members = memberUsers.map { userConverter.toDetails(it) },
+            owner = entity.ownerUser(users)?.let(userConverter::toDetails),
+            members = entity.members.mapNotNull { member -> users.firstOrNull { it.id == member.user.id } }
+                .map(userConverter::toDetails),
             createdAt = entity.createdAt,
         )
     }
 }
+
+private fun ChatEntity.ownerUser(users: Collection<UserEntity>): UserEntity? =
+    owner?.id?.let { ownerId -> users.firstOrNull { it.id == ownerId } }
 
 
 private fun Collection<MemberEntity>.mergeWith(other: Collection<UserRef>): Collection<MemberEntity> {

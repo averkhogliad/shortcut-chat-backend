@@ -9,10 +9,12 @@ import io.kotest.matchers.string.shouldNotBeBlank
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Import
+import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
@@ -26,6 +28,7 @@ private const val ISSUER = "http://localhost:8080"
 class AuthServerEndpointTest(
     private val mvc: MockMvc,
     private val mapper: ObjectMapper,
+    private val jwtDecoder: JwtDecoder,
 ) : FreeSpec({
 
     "GET /.well-known/openid-configuration" - {
@@ -71,6 +74,36 @@ class AuthServerEndpointTest(
             // when/then
             mvc.perform(post("/oauth2/token").param("grant_type", "authorization_code"))
                 .andExpect(status().isBadRequest())
+        }
+
+        "issues a JWT access token for the service client via client_credentials" {
+            // when
+            val body = mvc.perform(
+                post("/oauth2/token")
+                    .with(httpBasic("test-service-client", "test-service-client-secret"))
+                    .param("grant_type", "client_credentials")
+            )
+                .andExpect(status().isOk)
+                .andReturn()
+                .response
+                .contentAsString
+                .let(mapper::readTree)
+
+            // then
+            body["token_type"].stringValue() shouldBe "Bearer"
+            val token = body["access_token"].stringValue()
+            token.shouldNotBeBlank()
+            jwtDecoder.decode(token).subject shouldBe "test-service-client"
+        }
+
+        "rejects the service client with a wrong secret" {
+            // when/then
+            mvc.perform(
+                post("/oauth2/token")
+                    .with(httpBasic("test-service-client", "wrong-secret"))
+                    .param("grant_type", "client_credentials")
+            )
+                .andExpect(status().isUnauthorized)
         }
     }
 

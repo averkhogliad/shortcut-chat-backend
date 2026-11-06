@@ -7,7 +7,7 @@ import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Import
 
 @SpringBootTest
-@Import(TestcontainersConfiguration::class)
+@Import(TestcontainersConfiguration::class, TestSecurityConfiguration::class)
 class MessageAppTest(val ctx: ApplicationContext) : FreeSpec({
 
     "context loads" {

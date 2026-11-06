@@ -5,6 +5,7 @@ import io.averkhoglyad.shortcut.chat.core.model.ChatCreatedEvent
 import io.averkhoglyad.shortcut.chat.core.model.ChatDetails
 import io.averkhoglyad.shortcut.chat.core.model.ChatListItem
 import io.averkhoglyad.shortcut.chat.core.model.ChatRequest
+import io.averkhoglyad.shortcut.chat.core.model.User
 import io.averkhoglyad.shortcut.chat.core.model.UserRef
 import io.averkhoglyad.shortcut.chat.core.persistence.entity.ChatEntity
 import io.averkhoglyad.shortcut.chat.core.persistence.entity.MemberEntity
@@ -53,13 +54,16 @@ class ChatServiceTest : FreeSpec({
     }
 
     "listForUser" - {
-        "returns first page converted to list items" {
+        "returns first page converted to list items with owner" {
             // given
             val userId = randomUUID()
-            val entity = chatEntity()
+            val ownerId = randomUUID()
+            val owner = userEntity(ownerId)
+            val entity = chatEntity(ownerId = ownerId)
             val item = entity.toListItem()
             every { repository.findByMembersContainsOrderById(userId, any()) } returns listOf(entity)
-            every { converter.toListItem(entity) } returns item
+            every { userRepository.findByIdIsIn(listOf(ownerId)) } returns listOf(owner)
+            every { converter.toListItem(entity, listOf(owner)) } returns item
 
             // when
             val result = target.listForUser(userId, 10)
@@ -68,16 +72,19 @@ class ChatServiceTest : FreeSpec({
             result shouldBe listOf(item)
         }
 
-        "returns next page converted to list items" {
+        "returns next page converted to list items with owner" {
             // given
             val userId = randomUUID()
             val afterId = randomUUID()
-            val entity = chatEntity()
+            val ownerId = randomUUID()
+            val owner = userEntity(ownerId)
+            val entity = chatEntity(ownerId = ownerId)
             val item = entity.toListItem()
             every {
                 repository.findByMembersContainsAndIdGreaterThanOrderById(userId, afterId, any())
             } returns listOf(entity)
-            every { converter.toListItem(entity) } returns item
+            every { userRepository.findByIdIsIn(listOf(ownerId)) } returns listOf(owner)
+            every { converter.toListItem(entity, listOf(owner)) } returns item
 
             // when
             val result = target.listForUser(userId, afterId, 10)
@@ -101,15 +108,16 @@ class ChatServiceTest : FreeSpec({
             verify(exactly = 0) { userRepository.findByIdIsIn(any()) }
         }
 
-        "returns chat details with members" {
+        "returns chat details with owner and members" {
             // given
             val chatId = randomUUID()
-            val entity = chatEntity(id = chatId)
-            val memberEntities = listOf(userEntity(), userEntity())
+            val ownerId = randomUUID()
+            val entity = chatEntity(id = chatId, ownerId = ownerId)
+            val memberEntities = listOf(userEntity(ownerId), userEntity())
             val details = ChatDetails(
                 id = chatId,
                 name = entity.name,
-                owner = null,
+                owner = User(ownerId),
                 members = emptyList(),
                 createdAt = entity.createdAt,
             )
@@ -129,17 +137,18 @@ class ChatServiceTest : FreeSpec({
     "create" - {
         "saves chat and emits exactly one outbox message when all members are active" {
             // given
+            val ownerId = randomUUID()
             val memberIds = listOf(randomUUID(), randomUUID())
             val request = ChatRequest(
                 name = "chat",
                 members = memberIds.map { UserRef(it) },
             )
-            val entity = chatEntity()
-            val saved = chatEntity()
+            val entity = chatEntity(ownerId = ownerId)
+            val saved = chatEntity(ownerId = ownerId)
             val memberEntities = memberIds.map { userEntity(it) }
             val details = chatDetails(saved)
             val outboxMessage = chatCreatedMessage(details)
-            every { converter.toEntity(request) } returns entity
+            every { converter.toEntity(request, ownerId) } returns entity
             every { userRepository.findByIdIsInAndDeletedFalse(any()) } returns memberEntities
             every { repository.save(entity) } returns saved
             every { userRepository.findByIdIsIn(any()) } returns memberEntities
@@ -148,7 +157,7 @@ class ChatServiceTest : FreeSpec({
             every { outboxEmitter.emit(any(), any(), any(), any()) } just Runs
 
             // when
-            val result = target.create(request)
+            val result = target.create(request, ownerId)
 
             // then
             result.shouldBeInstanceOf<Success<ChatDetails>>()
@@ -157,12 +166,14 @@ class ChatServiceTest : FreeSpec({
             val savedEntity = slot<ChatEntity>()
             verify(exactly = 1) { repository.save(capture(savedEntity)) }
             savedEntity.captured shouldBeSameInstanceAs entity
+            savedEntity.captured.owner?.id shouldBe ownerId
 
             verifyChatCreatedEmittedOnce(outboxEmitter, outboxMessage)
         }
 
         "returns Invalid and writes nothing when a member is deleted" {
             // given
+            val ownerId = randomUUID()
             val activeMemberId = randomUUID()
             val deletedMemberId = randomUUID()
             val request = ChatRequest(
@@ -176,7 +187,7 @@ class ChatServiceTest : FreeSpec({
             )
 
             // when
-            val result = target.create(request)
+            val result = target.create(request, ownerId)
 
             // then
             result.shouldBeInstanceOf<Invalid<ChatDetails>>()
@@ -186,18 +197,19 @@ class ChatServiceTest : FreeSpec({
 
         "saves chat when a member id is absent from the projection" {
             // given
+            val ownerId = randomUUID()
             val knownMemberId = randomUUID()
             val unknownMemberId = randomUUID()
             val request = ChatRequest(
                 name = "chat",
                 members = listOf(UserRef(knownMemberId), UserRef(unknownMemberId)),
             )
-            val entity = chatEntity()
-            val saved = chatEntity()
+            val entity = chatEntity(ownerId = ownerId)
+            val saved = chatEntity(ownerId = ownerId)
             val memberEntities = listOf(userEntity(knownMemberId))
             val details = chatDetails(saved)
             val outboxMessage = chatCreatedMessage(details)
-            every { converter.toEntity(request) } returns entity
+            every { converter.toEntity(request, ownerId) } returns entity
             every { userRepository.findByIdIsInAndDeletedFalse(any()) } returns memberEntities
             every { userRepository.findByIdIsIn(any()) } returns memberEntities
             every { repository.save(entity) } returns saved
@@ -206,7 +218,7 @@ class ChatServiceTest : FreeSpec({
             every { outboxEmitter.emit(any(), any(), any(), any()) } just Runs
 
             // when
-            val result = target.create(request)
+            val result = target.create(request, ownerId)
 
             // then
             result.shouldBeInstanceOf<Success<ChatDetails>>()
@@ -221,12 +233,13 @@ class ChatServiceTest : FreeSpec({
 
         "saves chat and emits exactly one outbox message when the member list is empty" {
             // given
+            val ownerId = randomUUID()
             val request = ChatRequest(name = "chat", members = emptyList())
-            val entity = chatEntity()
-            val saved = chatEntity()
+            val entity = chatEntity(ownerId = ownerId)
+            val saved = chatEntity(ownerId = ownerId)
             val details = chatDetails(saved)
             val outboxMessage = chatCreatedMessage(details)
-            every { converter.toEntity(request) } returns entity
+            every { converter.toEntity(request, ownerId) } returns entity
             every { userRepository.findByIdIsIn(any()) } returns emptyList<UserEntity>()
             every { repository.save(entity) } returns saved
             every { converter.toDetails(saved, emptyList()) } returns details
@@ -234,7 +247,7 @@ class ChatServiceTest : FreeSpec({
             every { outboxEmitter.emit(any(), any(), any(), any()) } just Runs
 
             // when
-            val result = target.create(request)
+            val result = target.create(request, ownerId)
 
             // then
             result.shouldBeInstanceOf<Success<ChatDetails>>()
@@ -346,10 +359,12 @@ class ChatServiceTest : FreeSpec({
 private fun chatEntity(
     id: UUID = randomUUID(),
     name: String = "chat",
+    ownerId: UUID? = null,
     members: Set<MemberEntity> = emptySet(),
 ): ChatEntity = ChatEntity().apply {
     this.id = id
     this.name = name
+    this.owner = ownerId?.let { AggregateReference.to<UserEntity, UUID>(it) }
     this.members = members
     this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
 }
@@ -364,7 +379,7 @@ private fun userEntity(id: UUID = randomUUID(), deleted: Boolean = false): UserE
 private fun chatDetails(entity: ChatEntity) = ChatDetails(
     id = requireNotNull(entity.id),
     name = entity.name,
-    owner = null,
+    owner = entity.owner?.id?.let { User(it) },
     members = emptyList(),
     createdAt = entity.createdAt,
 )
@@ -376,7 +391,7 @@ private fun chatCreatedMessage(details: ChatDetails) = OutboxMessage<ChatCreated
     body = ChatCreatedEvent(
         id = details.id,
         name = details.name,
-        owner = null,
+        owner = details.owner?.let { UserRef(it.id) },
         members = emptyList(),
         createdAt = details.createdAt,
     ),
@@ -406,6 +421,6 @@ private fun memberEntity(chatId: UUID, userId: UUID): MemberEntity = MemberEntit
 private fun ChatEntity.toListItem() = ChatListItem(
     id = requireNotNull(id),
     name = name,
-    owner = null,
+    owner = owner?.id?.let { User(it) },
     createdAt = createdAt,
 )

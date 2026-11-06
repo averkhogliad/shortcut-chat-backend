@@ -9,3 +9,6 @@ spring:
           id: test-client
           secret: test-client-secret
           redirect-uri: http://localhost:8080/login/oauth2/code/test-client
+        service-client:
+          id: test-service-client
+          secret: test-service-client-secret

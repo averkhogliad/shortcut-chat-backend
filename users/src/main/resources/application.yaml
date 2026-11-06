@@ -51,6 +51,9 @@ spring:
           id: ${AUTH_SERVER_CLIENT_ID:shortcut-chat}
           secret: ${AUTH_SERVER_CLIENT_SECRET}
           redirect-uri: ${AUTH_SERVER_CLIENT_REDIRECT_URI:http://127.0.0.1:8080/login/oauth2/code/shortcut}
+        service-client:
+          id: ${AUTH_SERVER_SERVICE_CLIENT_ID}
+          secret: ${AUTH_SERVER_SERVICE_CLIENT_SECRET}
 
 server:
   shutdown: graceful

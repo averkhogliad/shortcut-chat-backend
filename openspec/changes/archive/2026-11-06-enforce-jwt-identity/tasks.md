@@ -2,8 +2,8 @@
 
 ## 1. `users` service — endpoint security enforcement
 
-- [ ] 1.1 Update `SecurityConfig` chain 2 in `users`: `GET /users/**` and `GET /users/by-email` require `authenticated()`; `POST /users` requires `hasRole("ADMIN")`; `PUT /users/{id}` requires `hasRole("ADMIN") or self`; `DELETE /users/{id}` requires `hasRole("ADMIN")`. Verify: unit/integration test — valid JWT with USER role can GET/PUT self but not POST/DELETE; ADMIN role can all.
-- [ ] 1.2 Add `@AuthenticationPrincipal` extraction to `UserController` methods where self-check is needed (PUT path). Verify: user can update own profile, cannot update others without ADMIN.
+- [ ] 1.1 Update `SecurityConfig` chain 2 in `users`: `/users/**` requires `authenticated()`; `POST /auth/code` and the authorization-server paths stay `permitAll`; `PUT /users/{id}` and `DELETE /users/{id}` require self (`#id == sub` via SpEL). **Roles deferred:** no `roles` claim and no `hasRole` in this cycle; ADMIN-only `POST /users` and ADMIN-or-self `PUT`/`DELETE` are deferred. Verify: valid token can GET/PUT/DELETE self; another id returns 403; no token returns 401.
+- [ ] 1.2 Add the `/users/me` self-service endpoints (`GET`, `PUT`, `DELETE`) with identity from the JWT `sub` claim, including `@AuthenticationPrincipal`/shared identity extraction where the self-check needs it. Verify: user can read, update, and delete own profile; changing email returns 400; no token returns 401.
 
 ## 2. `chats` service — JWT resource server
 
@@ -29,8 +29,8 @@
 - [ ] 5.1 Update existing `chats` endpoint tests: replace `.header("X-User-Id", userId)` with mock JWT via `SecurityMockMvcRequestPostProcessors.jwt().jwt(jwt -> jwt.subject(userId.toString()))`. Verify: existing test scenarios pass with JWT auth.
 - [ ] 5.2 Update existing `messages` endpoint tests: replace `.header("X-User-Id", userId)` with mock JWT. Verify: existing test scenarios pass with JWT auth.
 - [ ] 5.3 Update existing `notifications` SSE tests: replace `.uri("/subscribe?userId=$id")` with `.uri("/subscribe?token=$testToken")` using mock JWT. Verify: SSE test scenarios pass with token auth.
-- [ ] 5.4 Add test: `POST /users` without ADMIN role returns 403. Verify: test green.
-- [ ] 5.5 Add test: `PUT /users/{id}` by non-admin different user returns 403. Verify: test green.
+- [ ] 5.4 Add test: `PUT /users/{id}` by an authenticated caller for another user returns 403. **Deferred:** the ADMIN-role variant (`POST /users` without ADMIN → 403) is deferred until roles.
+- [ ] 5.5 Add test: `DELETE /users/{id}` by an authenticated caller for another user returns 403. **Deferred:** ADMIN-or-self and ADMIN-only `DELETE` variants are deferred until roles.
 
 ## 6. Specs and verification
 

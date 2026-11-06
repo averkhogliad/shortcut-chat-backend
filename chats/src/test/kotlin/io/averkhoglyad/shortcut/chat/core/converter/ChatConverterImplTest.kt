@@ -25,12 +25,7 @@ class ChatConverterImplTest : FreeSpec({
             val chatId = randomUUID()
             val owner = userEntity()
             val member = userEntity()
-            val entity = ChatEntity().apply {
-                this.id = chatId
-                this.name = "chat"
-                this.owner = AggregateReference.to<UserEntity, UUID>(requireNotNull(owner.id))
-                this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
-            }
+            val entity = chatEntity(chatId, owner, listOf(owner, member))
 
             // when
             val result = target.toDetails(entity, listOf(owner, member))
@@ -40,6 +35,7 @@ class ChatConverterImplTest : FreeSpec({
             result.name shouldBe entity.name
             result.createdAt shouldBe entity.createdAt
             result.owner?.id shouldBe owner.id
+            result.owner?.email shouldBe owner.email
             result.members.map { it.id } shouldContainExactlyInAnyOrder listOf(owner.id, member.id)
         }
 
@@ -47,12 +43,7 @@ class ChatConverterImplTest : FreeSpec({
             // given
             val owner = userEntity(deleted = true)
             val member = userEntity(deleted = true)
-            val entity = ChatEntity().apply {
-                this.id = randomUUID()
-                this.name = "chat"
-                this.owner = AggregateReference.to<UserEntity, UUID>(requireNotNull(owner.id))
-                this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
-            }
+            val entity = chatEntity(owner = owner, members = listOf(owner, member))
 
             // when
             val result = target.toDetails(entity, listOf(owner, member))
@@ -67,12 +58,7 @@ class ChatConverterImplTest : FreeSpec({
             // given
             val owner = userEntity()
             val member = userEntity()
-            val entity = ChatEntity().apply {
-                this.id = randomUUID()
-                this.name = "chat"
-                this.owner = AggregateReference.to<UserEntity, UUID>(requireNotNull(owner.id))
-                this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
-            }
+            val entity = chatEntity(owner = owner, members = listOf(owner, member))
 
             // when
             val result = target.toDetails(entity, listOf(owner, member))
@@ -81,30 +67,57 @@ class ChatConverterImplTest : FreeSpec({
             result.owner?.deleted shouldBe false
             result.members.forEach { it.deleted shouldBe false }
         }
+
+        "leaves owner null when the projection has no owner row" {
+            // given
+            val owner = userEntity()
+            val member = userEntity()
+            val entity = chatEntity(owner = owner, members = listOf(owner, member))
+
+            // when
+            val result = target.toDetails(entity, listOf(member))
+
+            // then
+            result.owner shouldBe null
+            result.members.map { it.id } shouldContainExactlyInAnyOrder listOf(member.id)
+        }
     }
 
     "toListItem" - {
-        "maps chat list fields" {
+        "maps chat list fields and owner" {
             // given
-            val entity = ChatEntity().apply {
-                this.id = randomUUID()
-                this.name = "chat"
-                this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
-            }
+            val owner = userEntity()
+            val entity = chatEntity(owner = owner)
 
             // when
-            val result = target.toListItem(entity)
+            val result = target.toListItem(entity, listOf(owner))
 
             // then
             result.id shouldBe entity.id
             result.name shouldBe entity.name
             result.createdAt shouldBe entity.createdAt
+            result.owner?.id shouldBe owner.id
+            result.owner?.name shouldBe owner.name
+            result.owner?.email shouldBe owner.email
+            result.owner?.deleted shouldBe owner.deleted
+        }
+
+        "leaves owner null when the projection has no owner row" {
+            // given
+            val entity = chatEntity(owner = userEntity())
+
+            // when
+            val result = target.toListItem(entity, emptyList())
+
+            // then
+            result.owner shouldBe null
         }
     }
 
     "toEntity" - {
-        "creates new chat with requested members" {
+        "creates new chat with requested members and owner" {
             // given
+            val ownerId = randomUUID()
             val firstMemberId = randomUUID()
             val secondMemberId = randomUUID()
             val request = ChatRequest(
@@ -113,10 +126,11 @@ class ChatConverterImplTest : FreeSpec({
             )
 
             // when
-            val result = target.toEntity(request)
+            val result = target.toEntity(request, ownerId)
 
             // then
             result.name shouldBe request.name
+            result.owner?.id shouldBe ownerId
             result.members.map { it.user.id } shouldContainExactlyInAnyOrder
                 listOf(firstMemberId, secondMemberId)
             result.members.forEach { it.createdAt shouldNotBe Instant.MIN }
@@ -153,6 +167,20 @@ class ChatConverterImplTest : FreeSpec({
         }
     }
 })
+
+private fun chatEntity(
+    chatId: UUID = randomUUID(),
+    owner: UserEntity? = null,
+    members: Collection<UserEntity> = emptyList(),
+): ChatEntity = ChatEntity().apply {
+    this.id = chatId
+    this.name = "chat"
+    this.owner = owner?.id?.let { AggregateReference.to<UserEntity, UUID>(it) }
+    this.members = members
+        .map { memberEntity(requireNotNull(it.id), Instant.parse("2026-01-01T00:00:00Z")) }
+        .toSet()
+    this.createdAt = Instant.parse("2026-01-01T00:00:00Z")
+}
 
 private fun userEntity(id: UUID = randomUUID(), deleted: Boolean = false): UserEntity = UserEntity().apply {
     this.id = id

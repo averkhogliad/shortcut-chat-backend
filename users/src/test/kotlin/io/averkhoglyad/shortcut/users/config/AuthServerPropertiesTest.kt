@@ -25,6 +25,8 @@ class AuthServerPropertiesTest : FreeSpec({
                 "$PREFIX.client.id" to "test-client",
                 "$PREFIX.client.secret" to "test-secret",
                 "$PREFIX.client.redirect-uri" to "http://localhost/callback",
+                "$PREFIX.service-client.id" to "test-service-client",
+                "$PREFIX.service-client.secret" to "test-service-client-secret",
             )
 
             // then
@@ -33,6 +35,8 @@ class AuthServerPropertiesTest : FreeSpec({
             properties.client.id shouldBe "test-client"
             properties.client.secret shouldBe "test-secret"
             properties.client.redirectUri shouldBe "http://localhost/callback"
+            properties.serviceClient.id shouldBe "test-service-client"
+            properties.serviceClient.secret shouldBe "test-service-client-secret"
         }
 
         "fails to bind when issuer is missing" {
@@ -43,6 +47,8 @@ class AuthServerPropertiesTest : FreeSpec({
                     "$PREFIX.client.id" to "test-client",
                     "$PREFIX.client.secret" to "test-secret",
                     "$PREFIX.client.redirect-uri" to "http://localhost/callback",
+                    "$PREFIX.service-client.id" to "test-service-client",
+                    "$PREFIX.service-client.secret" to "test-service-client-secret",
                 )
             }
 
@@ -58,11 +64,30 @@ class AuthServerPropertiesTest : FreeSpec({
                     "$PREFIX.jwk.file" to "target/jwk.json",
                     "$PREFIX.client.id" to "test-client",
                     "$PREFIX.client.redirect-uri" to "http://localhost/callback",
+                    "$PREFIX.service-client.id" to "test-service-client",
+                    "$PREFIX.service-client.secret" to "test-service-client-secret",
                 )
             }
 
             // then
             error.failureMessages() shouldContain "secret"
+        }
+
+        "fails to bind when service client secret is missing" {
+            // when
+            val error = shouldThrow<Exception> {
+                bind(
+                    "$PREFIX.issuer" to "http://localhost:8080",
+                    "$PREFIX.jwk.file" to "target/jwk.json",
+                    "$PREFIX.client.id" to "test-client",
+                    "$PREFIX.client.secret" to "test-secret",
+                    "$PREFIX.client.redirect-uri" to "http://localhost/callback",
+                    "$PREFIX.service-client.id" to "test-service-client",
+                )
+            }
+
+            // then
+            error.failureMessages() shouldContain "service-client"
         }
     }
 })
