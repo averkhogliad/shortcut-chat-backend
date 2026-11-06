@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.SpringBootCondition
 import org.springframework.context.annotation.Condition
 import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.ConditionContext
+import org.springframework.context.annotation.ConfigurationCondition
 import org.springframework.core.type.AnnotatedTypeMetadata
 import org.springframework.kafka.core.KafkaTemplate
 
@@ -15,7 +16,10 @@ import org.springframework.kafka.core.KafkaTemplate
 @Conditional(OutboxPublisherAvailableCondition::class)
 annotation class ConditionalOnOutboxPublisher
 
-class OutboxPublisherAvailableCondition : SpringBootCondition() {
+class OutboxPublisherAvailableCondition : SpringBootCondition(), ConfigurationCondition {
+
+    override fun getConfigurationPhase(): ConfigurationCondition.ConfigurationPhase =
+        ConfigurationCondition.ConfigurationPhase.REGISTER_BEAN
 
     override fun getMatchOutcome(
         context: ConditionContext,
