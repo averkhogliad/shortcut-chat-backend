@@ -4,7 +4,6 @@ import io.averkhoglyad.shortcut.outbox.messaging.OutboxPublisher
 import org.springframework.boot.autoconfigure.condition.ConditionMessage
 import org.springframework.boot.autoconfigure.condition.ConditionOutcome
 import org.springframework.boot.autoconfigure.condition.SpringBootCondition
-import org.springframework.context.annotation.Condition
 import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.ConditionContext
 import org.springframework.context.annotation.ConfigurationCondition

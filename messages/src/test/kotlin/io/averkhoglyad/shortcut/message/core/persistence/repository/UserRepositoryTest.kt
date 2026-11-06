@@ -23,7 +23,6 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace.NONE
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.simple.JdbcClient
-import java.time.Instant
 import java.util.*
 import kotlin.time.Duration.Companion.milliseconds
 

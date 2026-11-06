@@ -2,7 +2,6 @@ package io.averkhoglyad.shortcut.chat.core.persistence.repository
 
 import io.averkhoglyad.shortcut.chat.TestcontainersConfiguration
 import io.averkhoglyad.shortcut.chat.config.PersistenceConfig
-import io.averkhoglyad.shortcut.chat.core.persistence.entity.UserEntity
 import io.averkhoglyad.shortcut.common.test.asInstantColumn
 import io.averkhoglyad.shortcut.common.test.executeSql
 import io.kotest.core.spec.style.FreeSpec

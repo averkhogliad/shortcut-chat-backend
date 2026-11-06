@@ -17,7 +17,6 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
-import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Condition
 import org.springframework.context.annotation.Conditional
 import org.springframework.context.annotation.ConfigurationCondition

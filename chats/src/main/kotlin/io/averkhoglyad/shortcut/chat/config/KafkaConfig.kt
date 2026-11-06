@@ -1,8 +1,5 @@
 package io.averkhoglyad.shortcut.chat.config
 
-import io.averkhoglyad.shortcut.chat.core.model.UserCreatedPayload
-import io.averkhoglyad.shortcut.chat.core.model.UserDeletedPayload
-import io.averkhoglyad.shortcut.chat.core.model.UserUpdatedPayload
 import io.averkhoglyad.shortcut.chat.kafka.UserLifecycleTypeResolver
 import org.springframework.beans.factory.ObjectProvider
 import org.apache.kafka.clients.consumer.ConsumerConfig
